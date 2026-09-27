@@ -1,0 +1,114 @@
+@import "tailwindcss";
+
+/* Design tokens. Components use the Tailwind names (bg-surface, text-muted, border-line …),
+   never raw hex. Dark mode follows the OS setting. */
+:root {
+  --bg: #f5f6f4;
+  --surface: #ffffff;
+  --ink: #1f2430;
+  --muted: #5f6674;
+  --faint: #8a909b;
+  --line: #e2e5e1;
+  --track: #eceeeb;
+  --accent: #1f5e8c;
+  --accent-soft: #e6eff6;
+  --hema: #4a3d91;
+  --hema-soft: #ece9f7;
+  --eosin: #c9446d;
+  --eosin-soft: #fbe8ee;
+  --ok: #2f7d5b;
+  --ok-soft: #e3f3ea;
+  --warn: #a2640c;
+  --warn-soft: #fbf0dc;
+  /* subject colors, validated for color-vision deficiency in this order */
+  --s0: #d83f72; --s1: #5b4bd6; --s2: #e0701f; --s3: #16907f; --s4: #9a7a0f; --s5: #2f7fd1;
+  /* mountain scene */
+  --sky-top: #9cc3e6; --sky-bot: #eaf2f7; --far: #b9c9d6; --far2: #cfdbe3;
+  --snow: #ffffff; --rock: #9aa2a6; --meadow: #9fbf6e; --forest: #4f7a45; --tree: #2f5b36;
+  --trail: rgba(255, 255, 255, 0.85); --cloud: rgba(255, 255, 255, 0.9); --star: 0; --sun: #ffd36b; --pole: #2a2f38;
+  --shadow: 0 1px 2px rgba(31, 36, 48, 0.05), 0 6px 22px rgba(31, 36, 48, 0.07);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111419;
+    --surface: #1a1e25;
+    --ink: #e9ecf1;
+    --muted: #a3aab6;
+    --faint: #7d8491;
+    --line: #2b313b;
+    --track: #252a33;
+    --accent: #7fb4de;
+    --accent-soft: #1d2a38;
+    --hema: #a99cf0;
+    --hema-soft: #2b2545;
+    --eosin: #f07fa0;
+    --eosin-soft: #3a2230;
+    --ok: #6cc79c;
+    --ok-soft: #1d3329;
+    --warn: #e3a54a;
+    --warn-soft: #3a2d17;
+    --s0: #e0588a; --s1: #8a7cf0; --s2: #d6752e; --s3: #26a894; --s4: #a8891c; --s5: #5b8fe6;
+    --sky-top: #0b1224; --sky-bot: #27365a; --far: #26314a; --far2: #1e2840;
+    --snow: #dfe6f2; --rock: #5d6570; --meadow: #4d6a3f; --forest: #2f4a2f; --tree: #1e3522;
+    --trail: rgba(230, 236, 245, 0.7); --cloud: rgba(200, 210, 230, 0.3); --star: 1; --sun: #f3f0dc; --pole: #dfe6f2;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 6px 22px rgba(0, 0, 0, 0.3);
+    color-scheme: dark;
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-line: var(--line);
+  --color-track: var(--track);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-hema: var(--hema);
+  --color-hema-soft: var(--hema-soft);
+  --color-eosin: var(--eosin);
+  --color-eosin-soft: var(--eosin-soft);
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --font-display: "Bricolage Grotesque Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --shadow-card: var(--shadow);
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+}
+
+/* flashcard flip — easier as plain CSS than utilities */
+.flip-card { perspective: 1600px; }
+.flip-inner { display: grid; transition: transform 0.5s cubic-bezier(0.3, 0.7, 0.2, 1); transform-style: preserve-3d; }
+.flip-card[data-flipped="true"] .flip-inner { transform: rotateY(180deg); }
+.flip-face { grid-area: 1 / 1; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+.flip-back { transform: rotateY(180deg); }
+/* the hidden face must not catch taps meant for buttons on the visible one */
+.flip-card[data-flipped="true"] .flip-face:not(.flip-back),
+.flip-card[data-flipped="false"] .flip-back { pointer-events: none; }
+
+/* generated answers only contain b / i / ul / li / br (sanitized) */
+.rich ul { list-style: disc; padding-left: 1.3rem; }
+.rich li + li { margin-top: 0.3rem; }
+.rich b, .rich strong { font-weight: 600; }
+
+.cloud { animation: drift 70s linear infinite; }
+.cloud.c2 { animation-duration: 95s; animation-delay: -40s; }
+@keyframes drift { from { transform: translateX(-200px); } to { transform: translateX(1000px); } }
+.gain { animation: rise 1.3s ease-out forwards; }
+@keyframes rise { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-18px); } }
+.spin { animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .flip-inner, .cloud, .gain, .spin { transition: none; animation: none; }
+}
