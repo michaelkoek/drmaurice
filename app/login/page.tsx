@@ -2,7 +2,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { supabaseBrowser } from "@/lib/supabase/client";
+import { authClient } from "@/lib/auth-client";
 import { Btn, Field, Panel, inputCls } from "@/components/ui";
 
 export default function LoginPage() {
@@ -15,9 +15,9 @@ export default function LoginPage() {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true); setError(null);
-    const { error } = await supabaseBrowser().auth.signInWithPassword({ email: email.trim(), password });
+    const { error } = await authClient.signIn.email({ email: email.trim(), password });
     setBusy(false);
-    if (error) { setError("E-mailadres of wachtwoord klopt niet."); return; }
+    if (error) { setError(error.status === 429 ? "Te veel pogingen. Wacht even en probeer het opnieuw." : "E-mailadres of wachtwoord klopt niet."); return; }
     router.replace("/");
     router.refresh();
   }
@@ -35,13 +35,13 @@ export default function LoginPage() {
         <form onSubmit={submit} className="grid gap-4">
           <Field label="E-mailadres"><input id="email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} className={inputCls} /></Field>
           <Field label="Wachtwoord"><input id="password" type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} className={inputCls} /></Field>
-          {error && <p className="text-[13px] text-eosin">{error}</p>}
+          {error && <p role="alert" className="text-[13px] text-eosin">{error}</p>}
           <Btn variant="primary" type="submit" disabled={busy}>{busy ? "Bezig…" : "Inloggen"}</Btn>
         </form>
       </Panel>
       <p className="mt-4 text-center text-[13px] text-muted">
-        <Link href="/wachtwoord-vergeten" className="underline underline-offset-2 hover:text-ink">Wachtwoord vergeten?</Link>
-        <br />Nog geen account? Je krijgt een uitnodiging per e-mail.
+        Nog geen account? <Link href="/registreren" className="font-semibold text-ink underline underline-offset-2">Account aanmaken</Link>
+        <br />Wachtwoord vergeten? Vraag de beheerder om een nieuw wachtwoord.
       </p>
     </main>
   );

@@ -1,4 +1,4 @@
-import { supabaseBrowser } from "./supabase/client";
+import { authClient } from "./auth-client";
 import type { Exam, Lesson, OwnCard, Progress, Subject } from "./types";
 
 export interface Snapshot { email: string | null; exams: Exam[]; subjects: Subject[]; lessons: Lesson[]; own: OwnCard[]; progress: Progress[] }
@@ -14,41 +14,25 @@ export interface Backend {
   signOut(): Promise<void>;
 }
 
-const supabaseBackend: Backend = {
-  async load() {
-    const sb = supabaseBrowser();
-    const [{ data: u }, ex, su, le, ow, pr] = await Promise.all([
-      sb.auth.getUser(),
-      sb.from("exams").select("*").order("created_at"),
-      sb.from("subjects").select("*").order("position"),
-      sb.from("lessons").select("*").order("created_at"),
-      sb.from("own_cards").select("*").order("created_at"),
-      sb.from("progress").select("lesson_id,mastered,first_try,last_studied_at"),
-    ]);
-    for (const r of [ex, su, le, ow, pr]) if (r.error) throw r.error;
-    return { email: u.user?.email ?? null, exams: ex.data!, subjects: su.data!, lessons: le.data!, own: ow.data!, progress: pr.data! };
-  },
-  async insert(table, row) {
-    const { data, error } = await supabaseBrowser().from(table).insert(row).select().single();
-    if (error) throw error;
-    return data;
-  },
-  async update(table, id, patch) {
-    const { error } = await supabaseBrowser().from(table).update(patch).eq("id", id);
-    if (error) throw error;
-  },
-  async remove(table, id) {
-    const { error } = await supabaseBrowser().from(table).delete().eq("id", id);
-    if (error) throw error;
-  },
-  async saveProgress(p) {
-    const { error } = await supabaseBrowser().from("progress").upsert(p, { onConflict: "user_id,lesson_id" });
-    if (error) throw error;
-  },
-  async signOut() { await supabaseBrowser().auth.signOut(); },
+async function api<T>(init?: { body: Record<string, unknown> }): Promise<T> {
+  const res = await fetch("/api/data", init ? { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(init.body) } : undefined);
+  // the proxy only checks that a session cookie exists; an expired one lands here
+  if (res.status === 401) { window.location.href = "/login"; return new Promise<never>(() => {}); }
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw json; // { code, message }, e.g. code "23503" for a foreign-key violation
+  return json as T;
+}
+
+const neonBackend: Backend = {
+  load: () => api<Snapshot>(),
+  insert: (table, row) => api({ body: { op: "insert", table, row } }),
+  async update(table, id, patch) { await api({ body: { op: "update", table, id, row: patch } }); },
+  async remove(table, id) { await api({ body: { op: "remove", table, id } }); },
+  async saveProgress(p) { await api({ body: { op: "progress", progress: p } }); },
+  async signOut() { await authClient.signOut(); },
 };
 
-/** In-memory stand-in, only compiled in when NEXT_PUBLIC_E2E=1 (browser tests without Supabase). */
+/** In-memory stand-in, only compiled in when NEXT_PUBLIC_E2E=1 (browser tests without a database). */
 function memoryBackend(): Backend {
   const db: Record<string, Record<string, unknown>[]> = { exams: [], subjects: [], lessons: [], own_cards: [], progress: [] };
   (globalThis as unknown as { __dmcDb: typeof db }).__dmcDb = db;
@@ -65,4 +49,4 @@ function memoryBackend(): Backend {
   };
 }
 
-export const backend: Backend = process.env.NEXT_PUBLIC_E2E === "1" ? memoryBackend() : supabaseBackend;
+export const backend: Backend = process.env.NEXT_PUBLIC_E2E === "1" ? memoryBackend() : neonBackend;

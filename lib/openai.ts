@@ -1,6 +1,6 @@
 import "server-only";
 import OpenAI from "openai";
-import { supabaseServer } from "./supabase/server";
+import { currentUser } from "./auth";
 
 export function openai() {
   const apiKey = process.env.OPENAI_API_KEY;
@@ -20,10 +20,9 @@ export class ApiError extends Error {
 
 /** Only signed-in students may spend OpenAI credit. */
 export async function requireUser() {
-  const supabase = await supabaseServer();
-  const { data } = await supabase.auth.getUser();
-  if (!data.user) throw new ApiError(401, "unauthorized", "Log eerst in.");
-  return data.user;
+  const user = await currentUser();
+  if (!user) throw new ApiError(401, "unauthorized", "Log eerst in.");
+  return user;
 }
 
 export function errorResponse(e: unknown) {

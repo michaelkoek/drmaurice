@@ -54,3 +54,17 @@ export function Toaster() {
     </div>
   );
 }
+
+/** Live password checklist; ✓/○ plus colour so it doesn't rely on colour alone. */
+export function PasswordChecklist({ rules }: { rules: { id: string; label: string; ok: boolean }[] }) {
+  return (
+    <ul className="grid gap-0.5 text-[12px]" aria-label="Eisen aan het wachtwoord">
+      {rules.map((r) => (
+        <li key={r.id} className={r.ok ? "text-ok" : "text-muted"}>
+          <span aria-hidden className="inline-block w-4">{r.ok ? "✓" : "○"}</span>{r.label}
+          <span className="sr-only">{r.ok ? " (voldaan)" : " (nog niet voldaan)"}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}

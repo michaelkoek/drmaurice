@@ -11,6 +11,7 @@ export function AppHeader() {
       </Link>
       <div className="flex items-center gap-3 text-[13px] text-muted">
         <span className="hidden sm:inline">{email}</span>
+        <Link href="/wachtwoord" className="rounded-lg px-2 py-1 font-semibold hover:text-ink">Wachtwoord</Link>
         <button onClick={signOut} className="rounded-lg px-2 py-1 font-semibold hover:text-ink">Uitloggen</button>
       </div>
     </header>
