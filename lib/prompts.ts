@@ -13,7 +13,7 @@ SLIDES:
 ${input.digest}
 
 AFBEELDINGEN:
-${input.candidates.map((c) => `${c.id}: slide ${c.slide} ("${c.title}"), ${c.kb} kB`).join("\n")}`;
+${input.candidates.map((c) => `${c.id}: slide ${c.slide} ("${c.title}"), ${c.kb ? `${c.kb} kB` : "hele pagina uit een pdf"}`).join("\n")}`;
 }
 
 export const pickImagesSchema = {

@@ -10,7 +10,15 @@ export interface Slide {
   notes: string[];
   images: { path: string; type: string; size: number }[];
 }
-export interface ParsedPptx { zip: JSZip; slides: Slide[] }
+/** A lecture as slides, from a .pptx or a .pdf (lib/pdf.ts). `image` loads one of the slides' image paths. */
+export interface ParsedDeck { kind: "pptx" | "pdf"; slides: Slide[]; image(path: string): Promise<Blob> }
+
+export const DECK_EXT = /\.(pptx|pdf)$/i;
+
+export async function parseDeck(file: File): Promise<ParsedDeck> {
+  if (/\.pdf$/i.test(file.name)) return (await import("./pdf")).parsePdf(file);
+  return parsePptx(file);
+}
 export interface ParsedGoals { text: string; preview: Blob | null }
 
 /* ---- Apple Pages: text lives in snappy-compressed protobuf (.iwa) ---- */
@@ -109,7 +117,7 @@ function uncompressedSize(zip: JSZip, path: string): number {
   return f?._data?.uncompressedSize ?? 0;
 }
 
-export async function parsePptx(file: Blob | ArrayBuffer | Uint8Array): Promise<ParsedPptx> {
+export async function parsePptx(file: Blob | ArrayBuffer | Uint8Array): Promise<ParsedDeck> {
   const zip = await JSZip.loadAsync(file);
   const pres = "ppt/presentation.xml";
   const presFile = zip.file(pres);
@@ -138,7 +146,7 @@ export async function parsePptx(file: Blob | ArrayBuffer | Uint8Array): Promise<
       .filter((x) => x.type && zip.file(x.path));
     slides.push({ n: i + 1, text, notes, images });
   }
-  return { zip, slides };
+  return { kind: "pptx", slides, image: (path) => zip.file(path)!.async("blob") };
 }
 
 export async function parseGoals(file: File): Promise<ParsedGoals> {

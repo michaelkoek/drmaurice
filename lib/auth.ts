@@ -17,8 +17,11 @@ function createAuth() {
   return betterAuth({
     database: pool(),
     baseURL: process.env.BETTER_AUTH_URL,
-    // Vercel preview deployments get their own URL
-    trustedOrigins: process.env.VERCEL_URL ? [`https://${process.env.VERCEL_URL}`] : [],
+    // Vercel serves one deployment under several hosts (production domain, branch URL, deployment URL);
+    // trust all of them, not only BETTER_AUTH_URL
+    trustedOrigins: [process.env.VERCEL_PROJECT_PRODUCTION_URL, process.env.VERCEL_BRANCH_URL, process.env.VERCEL_URL]
+      .filter(Boolean)
+      .map((host) => `https://${host}`),
     // sign-up at /registreren, only for SIGNUP_ALLOWED_EMAILS; the admin can still create accounts with `npm run user -- add`
     emailAndPassword: { enabled: true, minPasswordLength: PASSWORD_MIN, maxPasswordLength: PASSWORD_MAX },
     hooks: {

@@ -1,13 +1,13 @@
 # DrMauriceCards
 
-Flashcards uit colleges voor een geneeskundestudent. Upload de PowerPoint van een les en het document met lesdoelen; de AI maakt kaarten met de nadruk op de lesdoelen, zet de les bij het juiste vak en meldt wat er ontbreekt of elkaar tegenspreekt. Voortgang is een bergbeklimming naar de toets.
+Flashcards uit colleges voor een geneeskundestudent. Upload de PowerPoint of pdf van een les en het document met lesdoelen; de AI maakt kaarten met de nadruk op de lesdoelen, zet de les bij het juiste vak en meldt wat er ontbreekt of elkaar tegenspreekt. Voortgang is een bergbeklimming naar de toets.
 
 **Stack:** Next.js 16 (App Router) · React 19 · Tailwind CSS v4 · Neon (Postgres) · Better Auth · OpenAI Responses API · Vercel.
 
 ## Hoe het werkt
 
 1. **Toets & vakken.** De student maakt een toets (naam, datum, aantal vragen) met 1–6 vakken. Elk vak is een graat op de berg.
-2. **Les toevoegen.** `.pptx` + lesdoelen (`.pages`, `.docx` of `.txt`) worden **in de browser** uitgelezen (`lib/parse.ts`). Er gaat alleen tekst en maximaal 8 verkleinde afbeeldingen naar de server.
+2. **Les toevoegen.** `.pptx` of `.pdf` + lesdoelen (`.pages`, `.docx` of `.txt`) worden **in de browser** uitgelezen (`lib/parse.ts`, `lib/pdf.ts`). Er gaat alleen tekst en maximaal 8 verkleinde afbeeldingen naar de server.
 3. **Twee AI-stappen** (`app/api/*`, sleutel alleen op de server):
    - `pick-images` kiest welke slide-afbeeldingen leerstof bevatten (schema's, tabellen).
    - `generate` schrijft de kaarten als JSON met een strikt schema en streamt de tekst terug zodat de pagina kan laten zien hoeveel kaarten er al zijn.
@@ -81,6 +81,7 @@ app/login             inloggen (wachtwoord wijzigen: app/(app)/wachtwoord)
 app/api/auth, api/data  Better Auth en alle data-toegang (server)
 components/           Dashboard, Mountain, ScoreChart, UploadLesson, Study, ExamForms, ui
 lib/parse.ts          .pptx / .pages / .docx uitlezen in de browser
+lib/pdf.ts            .pdf uitlezen in de browser (pdf.js); elke pagina telt als slide
 lib/prompts.ts        prompts en JSON-schema's (server)
 lib/normalize.ts      AI-JSON → les-concept
 lib/data.tsx          alle data van de student + opslaan (via lib/backend.ts)

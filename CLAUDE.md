@@ -1,6 +1,6 @@
 # DrMauriceCards
 
-Flashcard app for a Dutch medical student. Lecture `.pptx` + learning goals (`.pages`/`.docx`/`.txt`) → AI flashcards weighted toward the learning goals, grouped per exam and subject, practiced with a mountain-climb progress metaphor. UI language: **Dutch**. See README.md for setup and deploy.
+Flashcard app for a Dutch medical student. Lecture `.pptx` or `.pdf` + learning goals (`.pages`/`.docx`/`.txt`) → AI flashcards weighted toward the learning goals, grouped per exam and subject, practiced with a mountain-climb progress metaphor. UI language: **Dutch**. See README.md for setup and deploy.
 
 ## Stack
 Next.js 16 App Router (note: `proxy.ts`, not `middleware.ts`), React 19, Tailwind v4 (tokens in `app/globals.css`, use `bg-surface`, `text-muted`, `border-line` etc., never raw hex in components), Neon Postgres (`@neondatabase/serverless`) + Better Auth (email + password, sign-up at `/registreren` limited to `SIGNUP_ALLOWED_EMAILS`, no email so resets via `npm run user`), OpenAI Responses API with strict JSON schema, hosted on Vercel.
@@ -9,7 +9,7 @@ Next.js 16 App Router (note: `proxy.ts`, not `middleware.ts`), React 19, Tailwin
 - **Never add knowledge to cards.** The prompt forbids facts not in the slides; missing answers become cards with `a: null` and a `gap`. Keep it that way; the student can fill gaps with own cards.
 - The OpenAI key, `DATABASE_URL` and `BETTER_AUTH_SECRET` are server-only. Every API route calls `requireUser()` first.
 - All generated/user HTML goes through `clean()` (DOMPurify allowlist) before `dangerouslySetInnerHTML`.
-- Files are parsed client-side; only text + ≤8 downscaled images (JPEG ≤1280px) are sent, to stay under Vercel's 4.5 MB body limit.
+- Files are parsed client-side (PDF via pdf.js in `lib/pdf.ts`: each page is a slide, pages with a large image or no text are offered as whole-page images); only text + ≤8 downscaled images (JPEG ≤1280px) are sent, to stay under Vercel's 4.5 MB body limit.
 - Subject colors `--s0..--s5` are validated for colour-vision deficiency in that order; max 6 subjects per exam.
 - Password rules live in `lib/password.ts`, used by the forms (live checklist) and enforced server-side by the `hooks.before` in `lib/auth.ts`; leaked passwords are blocked by the `haveIBeenPwned` plugin. Change both together.
 - Data access goes through `lib/backend.ts` → `app/api/data/route.ts`. No RLS: that route scopes every query to the session user and checks FK parents belong to them; new tables/columns must be added to its whitelist. `NEXT_PUBLIC_E2E=1` swaps in an in-memory backend and skips the auth proxy — **test builds only, never set it in Vercel**.
