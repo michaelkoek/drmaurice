@@ -1,9 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { snappyUncompress } from "@/lib/parse";
-import { normalizeDraft, MISSING } from "@/lib/normalize";
+import { normalizeDraft, MISSING, MISSING_WEB } from "@/lib/normalize";
+import { cardsPrompt, webCardsPrompt } from "@/lib/prompts";
 import { cardsOf, dailyTarget, daysUntil, lessonStats } from "@/lib/stats";
 import { plainToHtml, escapeHtml } from "@/lib/sanitize";
 import type { Lesson, OwnCard, Subject } from "@/lib/types";
+
+vi.mock("server-only", () => ({}));
 
 const subjects: Subject[] = [
   { id: "s-pat", exam_id: "e", name: "Pathologie", hint: null, color: 0, position: 0 },
@@ -38,6 +41,11 @@ describe("normalizeDraft", () => {
     expect(d.cards[1]).toMatchObject({ a: null, gap: MISSING });
     expect(d.cards[2].g).toBe(0); // unknown goal falls outside the goals
     expect(d.findings.gaps).toEqual(["iets"]);
+  });
+  it("uses the web gap text for lessons researched online", () => {
+    const d = normalizeDraft({ kaarten: [{ lesdoel: 1, vraag: "Q", antwoord: null, bron: "", letOp: null }] }, subjects, { pptx: null, goals: null, slides: 0, web: true }, "x");
+    expect(d.cards[0].gap).toBe(MISSING_WEB);
+    expect(d.source.pptx).toBeNull();
   });
   it("rejects output without cards", () => {
     expect(() => normalizeDraft({ kaarten: [] }, subjects, src, "x")).toThrow();
@@ -75,5 +83,20 @@ describe("plainToHtml", () => {
   it("escapes and builds lists", () => {
     expect(plainToHtml("Intro <b>\n- een\n- twee\nslot")).toBe("Intro &lt;b&gt;<ul><li>een</li><li>twee</li></ul>slot");
     expect(escapeHtml(`"x"`)).toBe("&quot;x&quot;");
+  });
+});
+
+describe("prompts", () => {
+  const subs = [{ key: "v0", name: "Anatomie", hint: null }];
+  it("web prompt carries the goals and no slides", () => {
+    const p = webCardsPrompt({ goals: "1. Bouw van het hart", goalsAsImage: false, imageLabels: [], subjects: subs });
+    expect(p).toContain("1. Bouw van het hart");
+    expect(p).toContain("URL");
+    expect(p).not.toContain("SLIDES");
+  });
+  it("slide prompt keeps its numbered rules", () => {
+    const p = cardsPrompt({ goals: "", goalsAsImage: false, digest: "Slide 1: x", imageLabels: [], subjects: subs });
+    expect(p).toMatch(/\n9\. Neem de lesdoelen letterlijk over/);
+    expect(p).toContain('- "v0" = Anatomie');
   });
 });

@@ -8,6 +8,7 @@ interface Raw {
 }
 
 export const MISSING = "Dit staat niet in de presentatie. Zoek het op in het studiemateriaal.";
+export const MISSING_WEB = "Hiervoor is geen betrouwbare bron gevonden. Zoek het op in het studiemateriaal.";
 
 /** Model JSON → a draft lesson. Subjects are sent as keys v0..v5 in position order. */
 export function normalizeDraft(o: Raw, subjects: Subject[], source: Draft["source"], fallbackName: string): Draft {
@@ -16,6 +17,7 @@ export function normalizeDraft(o: Raw, subjects: Subject[], source: Draft["sourc
     .map((g, i) => ({ id: Number(g.id) || i + 1, t: String(g.tekst ?? "").trim(), cov: (g.dekking === "volledig" ? "full" : g.dekking === "geen" ? "none" : "part") as Goal["cov"] }))
     .filter((g) => g.t);
   const ids = new Set(goals.map((g) => g.id));
+  const missing = source.web ? MISSING_WEB : MISSING;
   const cards: Card[] = o.kaarten.filter((k) => k && String(k.vraag ?? "").trim()).map((k, i) => {
     const a = k.antwoord == null ? "" : String(k.antwoord).trim();
     const g = Number(k.lesdoel);
@@ -26,7 +28,7 @@ export function normalizeDraft(o: Raw, subjects: Subject[], source: Draft["sourc
       a: a || null,
       ref: String(k.bron ?? "").trim(),
       note: k.letOp ? String(k.letOp) : null,
-      gap: a ? null : MISSING,
+      gap: a ? null : missing,
     };
   });
   if (!cards.length) throw new Error("invalid_json");

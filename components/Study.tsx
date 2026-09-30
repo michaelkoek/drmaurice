@@ -24,6 +24,7 @@ export function Study({ lessonId }: { lessonId: string }) {
   const [flipped, setFlipped] = useState(false);
   const [form, setForm] = useState<FormCtx | null>(null);
   const [gains, setGains] = useState<{ id: number; at: number }[]>([]);
+  const [sureReset, setSureReset] = useState(false);
   const built = useRef(false);
 
   const goals = lesson?.goals ?? [];
@@ -53,6 +54,12 @@ export function Study({ lessonId }: { lessonId: string }) {
     if (idx + 1 >= deck.length) toast(`Basiskamp ${lesson?.name} bereikt`);
     next();
   }, [current, mastered, d, lessonId, scope, idx, deck.length, lesson?.name, next]);
+  // reset clears mastered + first tries, so every in-scope card goes back in the deck
+  const restart = () => {
+    d.resetProgress(lessonId);
+    setDeck(scope.map((c) => c.id));
+    setIdx(0); setFlipped(false); setSureReset(false);
+  };
   const again = useCallback(() => {
     if (!current) return;
     d.answer(lessonId, current.id, false);
@@ -88,6 +95,8 @@ export function Study({ lessonId }: { lessonId: string }) {
   const label = current && current.g && goal ? `LD${current.g} · ${goal.t}` : "Buiten de lesdoelen";
   const own = d.own.filter((o) => o.lesson_id === lessonId);
   const hasExtra = cards.some((c) => c.g === 0) && goals.length > 0;
+  const web = !!lesson.source?.web;
+  const started = progress.mastered.length > 0 || Object.keys(progress.first_try).length > 0;
 
   return (
     <section className="mx-auto grid max-w-[820px] gap-[18px]">
@@ -98,6 +107,12 @@ export function Study({ lessonId }: { lessonId: string }) {
             <span className="size-[9px] flex-none rounded-full" style={{ background: color }} />
             <b className="text-[15px] font-semibold text-ink">{lesson.name}</b><span>· {subject?.name ?? "Zonder vak"}</span>
           </span>
+          {started && (sureReset ? (
+            <span className="flex flex-wrap items-center gap-2 text-sm">Voortgang en score wissen?
+              <Btn variant="danger" onClick={() => { restart(); toast("Voortgang gereset"); }}>Resetten</Btn>
+              <Btn onClick={() => setSureReset(false)}>Annuleren</Btn>
+            </span>
+          ) : <Btn variant="ghost" onClick={() => setSureReset(true)}>Voortgang resetten</Btn>)}
           <Btn onClick={() => setForm({ mode: "add" })}>+ Kaart toevoegen</Btn>
         </div>
         <div className="grid grid-cols-[1fr_auto] items-center gap-3">
@@ -111,7 +126,7 @@ export function Study({ lessonId }: { lessonId: string }) {
         </div>
       </div>
 
-      {form && <OwnCardForm key={form.mode + ("card" in form ? form.card.id : "")} ctx={form} lessonId={lessonId} goals={goals} onClose={() => setForm(null)} />}
+      {form && <OwnCardForm key={form.mode + ("card" in form ? form.card.id : "")} ctx={form} lessonId={lessonId} goals={goals} web={web} onClose={() => setForm(null)} />}
 
       {current ? (
         <>
@@ -132,7 +147,7 @@ export function Study({ lessonId }: { lessonId: string }) {
                   </div>
                 )}
                 {current.note && <div className="rich rounded-lg bg-warn-soft px-2.5 py-2 text-[13px] text-warn"><b>Let op:</b> <span dangerouslySetInnerHTML={{ __html: clean(current.note) }} /></div>}
-                <div className="border-t border-dashed border-line pt-2.5 font-mono text-xs text-muted">Bron: {current.ref || "–"}</div>
+                <div className="break-words border-t border-dashed border-line pt-2.5 font-mono text-xs text-muted">Bron: {current.ref ? <RefText text={current.ref} /> : "–"}</div>
               </Face>
             </div>
           </div>
@@ -147,7 +162,7 @@ export function Study({ lessonId }: { lessonId: string }) {
         </>
       ) : (
         <Summary lessonName={lesson.name} scope={scope} goals={goals.filter((g) => activeSet.has(g.id))} cards={cards} firstTry={progress.first_try}
-          onDash={() => router.push(`/?examen=${lesson.exam_id}`)} onRedo={() => { d.resetProgress(lessonId); setTimeout(rebuild, 0); }} />
+          onDash={() => router.push(`/?examen=${lesson.exam_id}`)} onRedo={restart} />
       )}
 
       {goals.length > 0 && (
@@ -157,7 +172,7 @@ export function Study({ lessonId }: { lessonId: string }) {
               onClick={() => { const n = new Set(activeSet); if (n.has(g.id)) n.delete(g.id); else n.add(g.id); if (!n.size) n.add(g.id); setActive(n); }}
               className="grid w-full grid-cols-[auto_1fr_auto] items-start gap-2.5 rounded-[10px] border border-line bg-surface px-3 py-2 text-left text-sm leading-snug hover:border-hema aria-pressed:border-hema aria-pressed:bg-hema-soft">
               <span className="pt-px font-mono text-xs text-hema">LD{g.id}</span>
-              <span>{g.t}<br /><span className="mt-1 inline-block">{g.cov === "full" ? <Chip tone="ok">Gedekt in presentatie</Chip> : g.cov === "none" ? <Chip tone="warn">Niet in presentatie</Chip> : <Chip tone="warn">Deels in presentatie</Chip>}</span></span>
+              <span>{g.t}<br /><span className="mt-1 inline-block">{g.cov === "full" ? <Chip tone="ok">{web ? "Gedekt in bronnen" : "Gedekt in presentatie"}</Chip> : g.cov === "none" ? <Chip tone="warn">{web ? "Niet gevonden in bronnen" : "Niet in presentatie"}</Chip> : <Chip tone="warn">{web ? "Deels gevonden in bronnen" : "Deels in presentatie"}</Chip>}</span></span>
               <span className="font-mono text-xs text-muted">{cards.filter((c) => c.g === g.id).length}</span>
             </button>
           ))}
@@ -166,7 +181,7 @@ export function Study({ lessonId }: { lessonId: string }) {
       )}
 
       <Drawer title="Bronnotities" meta={`${lesson.findings.gaps.length} ${lesson.findings.gaps.length === 1 ? "gat" : "gaten"}, ${lesson.findings.conflicts.length} ${lesson.findings.conflicts.length === 1 ? "tegenstrijdigheid" : "tegenstrijdigheden"}`}>
-        <h3 className="text-sm font-semibold">Ontbreekt in de presentatie</h3>
+        <h3 className="text-sm font-semibold">{web ? "Niet gevonden in bronnen" : "Ontbreekt in de presentatie"}</h3>
         {lesson.findings.gaps.length ? <ol className="grid list-decimal gap-1.5 pl-5 text-sm">{lesson.findings.gaps.map((x, i) => <li key={i} className="rich" dangerouslySetInnerHTML={{ __html: clean(x) }} />)}</ol> : <p className="text-sm text-muted">Niets gevonden.</p>}
         <h3 className="text-sm font-semibold">Tegenstrijdig in de bron</h3>
         {lesson.findings.conflicts.length ? <ol className="grid list-decimal gap-1.5 pl-5 text-sm">{lesson.findings.conflicts.map((x, i) => <li key={i} className="rich" dangerouslySetInnerHTML={{ __html: clean(x) }} />)}</ol> : <p className="text-sm text-muted">Niets gevonden.</p>}
@@ -189,6 +204,12 @@ export function Study({ lessonId }: { lessonId: string }) {
       <LessonSettings lessonId={lessonId} />
     </section>
   );
+}
+
+/** Source line with any http(s) URLs as links, so the student can check a web source. */
+function RefText({ text }: { text: string }) {
+  return <>{text.split(/(https?:\/\/[^\s<>"')\]]+)/).map((part, i) =>
+    i % 2 ? <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="underline hover:text-ink" onClick={(e) => e.stopPropagation()}>{part}</a> : part)}</>;
 }
 
 function Face({ back, children }: { back?: boolean; children: React.ReactNode }) {
@@ -236,7 +257,7 @@ function Summary({ lessonName, scope, goals, cards, firstTry, onDash, onRedo }: 
   );
 }
 
-function OwnCardForm({ ctx, lessonId, goals, onClose }: { ctx: FormCtx; lessonId: string; goals: { id: number; t: string }[]; onClose: () => void }) {
+function OwnCardForm({ ctx, lessonId, goals, web, onClose }: { ctx: FormCtx; lessonId: string; goals: { id: number; t: string }[]; web: boolean; onClose: () => void }) {
   const d = useData();
   const src = ctx.mode === "add" ? null : ctx.card;
   const [q, setQ] = useState(src?.q ?? "");
@@ -264,7 +285,7 @@ function OwnCardForm({ ctx, lessonId, goals, onClose }: { ctx: FormCtx; lessonId
   return (
     <form ref={box} onSubmit={submit} noValidate className="grid gap-3 rounded-2xl border border-line bg-surface p-5">
       <h2 className="font-display text-lg font-bold">{ctx.mode === "edit" ? "Eigen kaart bewerken" : ctx.mode === "fill" ? "Antwoord zelf invullen" : "Eigen kaart toevoegen"}</h2>
-      <p className="text-[13px] text-muted">{ctx.mode === "fill" ? "Dit stond niet in de presentatie. Vul het antwoord in uit de reader of je aantekeningen; jouw kaart vervangt deze." : "Voor stof die de AI heeft gemist, of die je uit de reader of je aantekeningen haalt."}</p>
+      <p className="text-[13px] text-muted">{ctx.mode === "fill" ? `${web ? "Hiervoor is geen betrouwbare bron gevonden" : "Dit stond niet in de presentatie"}. Vul het antwoord in uit de reader of je aantekeningen; jouw kaart vervangt deze.` : "Voor stof die de AI heeft gemist, of die je uit de reader of je aantekeningen haalt."}</p>
       <Field label="Vraag"><textarea id="cf-q" rows={2} className={inputCls} value={q} maxLength={1000} onChange={(e) => { setQ(e.target.value); setError(null); }} /></Field>
       <Field label="Antwoord"><textarea id="cf-a" rows={4} className={inputCls} value={a} maxLength={5000} placeholder="Begin een regel met - voor een opsomming" onChange={(e) => { setA(e.target.value); setError(null); }} /></Field>
       <div className="grid gap-3 sm:grid-cols-2">

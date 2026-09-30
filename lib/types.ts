@@ -43,7 +43,7 @@ export interface Lesson {
   goals: Goal[];
   cards: Card[];
   findings: Findings;
-  source: { pptx: string; goals: string | null; slides: number } | null;
+  source: LessonSource | null;
   created_at: string;
 }
 
@@ -74,8 +74,11 @@ export interface Draft {
   goals: Goal[];
   cards: Card[];
   findings: Findings;
-  source: { pptx: string; goals: string | null; slides: number };
+  source: LessonSource;
 }
 
 export const MAX_SUBJECTS = 6;
 export const METERS_PER_CARD = 10;
+
+/** Where a lesson's cards came from; `web` = no presentation, researched from the learning goals. */
+export interface LessonSource { pptx: string | null; goals: string | null; slides: number; web?: boolean }

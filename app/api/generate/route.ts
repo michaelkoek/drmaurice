@@ -1,10 +1,13 @@
 import { ApiError, checkImages, errorResponse, model, openai, requireUser, str } from "@/lib/openai";
-import { cardsPrompt, cardsSchema, type SubjectRef } from "@/lib/prompts";
+import { TRUSTED_DOMAINS, cardsPrompt, cardsSchema, webCardsPrompt, type SubjectRef } from "@/lib/prompts";
 
-// Long lessons with images can take a couple of minutes.
+// Long lessons with images (or web research) can take a couple of minutes.
 export const maxDuration = 300;
 
-/** Streams the model's JSON as plain text so the page can show progress; the page parses it at the end. */
+/**
+ * Streams the model's JSON as plain text so the page can show progress; the page parses it at the end.
+ * mode "web" = learning goals without a presentation: the model researches them with web search on TRUSTED_DOMAINS.
+ */
 export async function POST(req: Request) {
   let stream: AsyncIterable<{ type: string; delta?: string; response?: { error?: { message?: string } } }>;
   try {
@@ -15,13 +18,14 @@ export async function POST(req: Request) {
     }));
     if (!subjects.length) throw new ApiError(400, "bad_request", "Maak eerst vakken aan.");
     const images = checkImages(body.images);
-    const prompt = cardsPrompt({
-      goals: str(body.goals, 8000),
-      goalsAsImage: !!body.goalsAsImage,
-      digest: str(body.digest, 60000),
-      imageLabels: images.map((i, n) => `Afbeelding ${n + 1} = ${i.label}`),
-      subjects,
-    });
+    const web = body.mode === "web";
+    const goals = str(body.goals, 8000);
+    const goalsAsImage = !!body.goalsAsImage;
+    const imageLabels = images.map((i, n) => `Afbeelding ${n + 1} = ${i.label}`);
+    if (web && !goals.trim() && !(goalsAsImage && images.length)) throw new ApiError(400, "bad_request", "Geef eerst de lesdoelen op.");
+    const prompt = web
+      ? webCardsPrompt({ goals, goalsAsImage, imageLabels, subjects })
+      : cardsPrompt({ goals, goalsAsImage, digest: str(body.digest, 60000), imageLabels, subjects });
     stream = (await openai().responses.create({
       model: model(),
       input: [{
@@ -31,6 +35,7 @@ export async function POST(req: Request) {
           ...images.map((i) => ({ type: "input_image" as const, image_url: i.dataUrl, detail: "auto" as const })),
         ],
       }],
+      ...(web && { tools: [{ type: "web_search" as const, filters: { allowed_domains: TRUSTED_DOMAINS }, search_context_size: "medium" as const }] }),
       text: { format: { type: "json_schema", name: "flashcards", schema: cardsSchema(subjects.map((s) => s.key)), strict: true } },
       stream: true,
     })) as unknown as typeof stream;

@@ -47,7 +47,7 @@ Geef het tijdelijke wachtwoord door; de student wijzigt het na inloggen via **Wa
 | `BETTER_AUTH_URL` | | Publieke URL van de site (bv. `https://drmauricecards.vercel.app`) |
 | `SIGNUP_ALLOWED_EMAILS` | | E-mailadressen die mogen registreren, komma-gescheiden. Leeg = niemand |
 | `OPENAI_API_KEY` | platform.openai.com | **Alleen server.** Nooit met `NEXT_PUBLIC_` ervoor |
-| `OPENAI_MODEL` | | Een model dat afbeeldingen en structured outputs ondersteunt |
+| `OPENAI_MODEL` | | Een model dat afbeeldingen, structured outputs en de `web_search`-tool ondersteunt (voor lessen met alleen lesdoelen) |
 | `OPENAI_MODEL_FAST` | optioneel | Goedkoper model voor de afbeeldingskeuze; valt terug op `OPENAI_MODEL` |
 
 ## Naar GitHub en Vercel

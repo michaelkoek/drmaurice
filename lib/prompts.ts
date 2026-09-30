@@ -23,6 +23,15 @@ export const pickImagesSchema = {
   properties: { ids: { type: "array", items: { type: "string" } } },
 } as const;
 
+/** Card form, count, subject and goal rules shared by the slide and web prompts; numbered from `n`. */
+function commonRules(n: number, subjects: SubjectRef[]) {
+  return `${n}. Eén feit of één samenhang per kaart. Vraag kort en concreet. Antwoord kort; gebruik bij opsommingen <ul><li>…</li></ul> en <b> voor kernbegrippen. Geen andere HTML.
+${n + 1}. Maak tussen 15 en 60 kaarten, afhankelijk van hoeveel stof er is. Liever minder goede kaarten dan opvulling.
+${n + 2}. Kies in "vak" het vak waar deze les het best bij hoort (gebruik ook hints zoals het boek of de lessenreeks in de lesdoelen):
+${subjects.map((s) => `- "${s.key}" = ${s.name}${s.hint ? `: ${s.hint}` : ""}`).join("\n")}
+${n + 3}. Neem de lesdoelen letterlijk over in "lesdoelen", genummerd vanaf 1 in de volgorde van het document.`;
+}
+
 export function cardsPrompt(input: { goals: string; goalsAsImage: boolean; digest: string; imageLabels: string[]; subjects: SubjectRef[] }) {
   const goalsBlock = input.goals
     || (input.goalsAsImage
@@ -36,11 +45,7 @@ HARDE REGELS
 3. Leg de nadruk op de LESDOELEN. Ongeveer 85% van de kaarten hoort bij een lesdoel. Stof die nergens onder een lesdoel valt krijgt "lesdoel": 0 en maximaal zo'n 15% van de kaarten.
 4. Staat een lesdoel (of een deel ervan) NIET in de presentatie, maak dan precies één kaart met die vraag, "antwoord": null, en noem het in "ontbreekt". Zet de dekking van dat lesdoel op "deels" of "geen".
 5. Spreken slides elkaar tegen, neem dan de duidelijkste bron (bijvoorbeeld een tabel) en zet het verschil in "letOp". Noem de tegenstrijdigheid ook in "tegenstrijdig".
-6. Eén feit of één samenhang per kaart. Vraag kort en concreet. Antwoord kort; gebruik bij opsommingen <ul><li>…</li></ul> en <b> voor kernbegrippen. Geen andere HTML.
-7. Maak tussen 15 en 60 kaarten, afhankelijk van hoeveel stof er is. Liever minder goede kaarten dan opvulling.
-8. Kies in "vak" het vak waar deze les het best bij hoort (gebruik ook hints zoals het boek of de lessenreeks in de lesdoelen):
-${input.subjects.map((s) => `- "${s.key}" = ${s.name}${s.hint ? `: ${s.hint}` : ""}`).join("\n")}
-9. Neem de lesdoelen letterlijk over in "lesdoelen", genummerd vanaf 1 in de volgorde van het document.
+${commonRules(6, input.subjects)}
 
 LESDOELEN (uit het document):
 ${goalsBlock}
@@ -50,6 +55,33 @@ ${input.imageLabels.length ? input.imageLabels.join("\n") : "Geen."}
 
 SLIDES
 ${input.digest}`;
+}
+
+/** Sites the web-search tool may use when there is no presentation. Subdomains are included. */
+export const TRUSTED_DOMAINS = [
+  "ncbi.nlm.nih.gov", "medlineplus.gov", "cdc.gov", "who.int", "nice.org.uk", "nhs.uk",
+  "nhg.org", "thuisarts.nl", "rivm.nl", "lareb.nl", "farmacotherapeutischkompas.nl", "richtlijnendatabase.nl",
+  "merckmanuals.com", "radiopaedia.org", "wikipedia.org",
+];
+
+/** Goals only, no presentation: the model researches each goal with web search, restricted to TRUSTED_DOMAINS. */
+export function webCardsPrompt(input: { goals: string; goalsAsImage: boolean; imageLabels: string[]; subjects: SubjectRef[] }) {
+  const goalsBlock = input.goals || "Zie de afbeelding van het lesdoelen-document.";
+  return `Je maakt flashcards voor een geneeskundestudent (Nederlandstalig) uit één les. De student krijgt later één toets over alle lessen. Er is GEEN presentatie; alleen de lesdoelen. Zoek de stof per lesdoel op met de zoekfunctie (web search) en maak daar kaarten van.
+
+HARDE REGELS
+1. Gebruik ALLEEN informatie uit pagina's die je met de zoekfunctie hebt gevonden en gelezen. Voeg geen kennis uit je geheugen toe en verzin geen antwoorden. Zoek gerust in het Engels; schrijf de kaarten in het Nederlands.
+2. Elk antwoord noemt in "bron" de naam van de site en de volledige URL van de pagina, bijvoorbeeld "StatPearls: https://www.ncbi.nlm.nih.gov/books/NBK…".
+3. Alle kaarten horen bij een lesdoel. Gebruik "lesdoel": 0 alleen voor noodzakelijke basiskennis die bij geen enkel lesdoel past, en hooguit voor enkele kaarten.
+4. Vind je voor een lesdoel (of een deel ervan) geen betrouwbare bron, maak dan precies één kaart met die vraag, "antwoord": null, en noem het in "ontbreekt". Zet de dekking van dat lesdoel op "deels" of "geen". "volledig" betekent: goed gedekt door de gevonden bronnen.
+5. Spreken bronnen elkaar tegen, kies de meest gezaghebbende (richtlijn of review boven encyclopedie) en zet het verschil in "letOp". Noem de tegenstrijdigheid ook in "tegenstrijdig", met beide URL's.
+${commonRules(6, input.subjects)}
+
+LESDOELEN (uit het document):
+${goalsBlock}
+
+MEEGESTUURDE AFBEELDINGEN
+${input.imageLabels.length ? input.imageLabels.join("\n") : "Geen."}`;
 }
 
 export function cardsSchema(subjectKeys: string[]) {
