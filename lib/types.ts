@@ -81,4 +81,7 @@ export const MAX_SUBJECTS = 6;
 export const METERS_PER_CARD = 10;
 
 /** Where a lesson's cards came from; `web` = no presentation, researched from the learning goals. */
-export interface LessonSource { pptx: string | null; goals: string | null; slides: number; web?: boolean }
+export interface LessonSource { pptx: string | null; goals: string | null; slides: number; web?: boolean; usage?: Usage[] }
+
+/** Token usage of one OpenAI call, logged by the API routes and kept on the lesson to see its cost. */
+export interface Usage { model: string; input: number; cached: number; output: number; reasoning: number; searches: number }

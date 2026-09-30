@@ -1,6 +1,7 @@
 import "server-only";
 import OpenAI from "openai";
 import { currentUser } from "./auth";
+import type { Usage } from "./types";
 
 export function openai() {
   const apiKey = process.env.OPENAI_API_KEY;
@@ -12,6 +13,26 @@ export function model(fast = false) {
   const m = (fast && process.env.OPENAI_MODEL_FAST) || process.env.OPENAI_MODEL;
   if (!m) throw new ApiError(500, "missing_model", "OPENAI_MODEL ontbreekt op de server.");
   return m;
+}
+
+
+type RawUsage = {
+  input_tokens?: number; output_tokens?: number;
+  input_tokens_details?: { cached_tokens?: number }; output_tokens_details?: { reasoning_tokens?: number };
+} | null | undefined;
+
+/** Logs one line per call so cost per upload can be read from the Vercel logs. */
+export function logUsage(route: string, model: string, raw: RawUsage, extra: { searches?: number } & Record<string, unknown> = {}): Usage {
+  const usage: Usage = {
+    model,
+    input: raw?.input_tokens ?? 0,
+    cached: raw?.input_tokens_details?.cached_tokens ?? 0,
+    output: raw?.output_tokens ?? 0,
+    reasoning: raw?.output_tokens_details?.reasoning_tokens ?? 0,
+    searches: extra.searches ?? 0,
+  };
+  console.log("[openai-usage]", JSON.stringify({ route, ...extra, ...usage }));
+  return usage;
 }
 
 export class ApiError extends Error {

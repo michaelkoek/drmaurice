@@ -2,7 +2,7 @@
 import { slideDigest, type ParsedDeck, type ParsedGoals } from "./parse";
 import { toDataUrl } from "./image";
 import { normalizeDraft } from "./normalize";
-import type { Draft, Subject } from "./types";
+import type { Draft, Subject, Usage } from "./types";
 
 export type StepKey = "read" | "pick" | "write" | "check";
 export type StepState = "idle" | "on" | "ok" | "fail";
@@ -29,6 +29,7 @@ export async function generateLesson(opts: {
   const goalsText = (goals?.text ?? "").trim();
   const goalsAsImage = !goalsText && !!goals?.preview;
   const images: { dataUrl: string; label: string }[] = [];
+  const usage: Usage[] = [];
   let digest = "";
 
   if (deck) {
@@ -48,7 +49,9 @@ export async function generateLesson(opts: {
     if (cands.length > room) {
       onStep("pick", "on");
       const res = await postJson("/api/pick-images", { goals: goalsText, digest: slideDigest(deck.slides, 30000), candidates: cands.map(({ path: _p, ...c }) => c), max: room }, signal);
-      const ids = new Set<string>((await res.json()).ids ?? []);
+      const picked = await res.json();
+      if (picked.usage) usage.push(picked.usage);
+      const ids = new Set<string>(picked.ids ?? []);
       chosen = cands.filter((c) => ids.has(c.id));
     }
     for (const c of chosen.slice(0, room)) {
@@ -81,6 +84,12 @@ export async function generateLesson(opts: {
     const m = (text.match(/"vraag"\s*:/g) || []).length;
     if (m !== n) { n = m; onStep("write", "on", `${n} ${n === 1 ? "kaart" : "kaarten"} geschreven…`); }
   }
+  // the server appends "\u0000USAGE{…}" after the JSON
+  const cut = text.indexOf("\u0000USAGE");
+  if (cut >= 0) {
+    try { usage.push(JSON.parse(text.slice(cut + 6))); } catch { /* usage is optional */ }
+    text = text.slice(0, cut);
+  }
   if (text.includes("\u0000ERROR")) throw new GenError("upstream_error", "Het schrijven van de kaarten is afgebroken. Probeer het opnieuw.");
   let raw: unknown;
   try { raw = JSON.parse(text); } catch { throw new GenError("invalid_json", "Het antwoord kon niet worden gelezen. Probeer het opnieuw."); }
@@ -90,8 +99,8 @@ export async function generateLesson(opts: {
   let draft: Draft;
   try {
     const source: Draft["source"] = deck
-      ? { pptx: opts.deckName, goals: opts.goalsName, slides: deck.slides.length }
-      : { pptx: null, goals: opts.goalsName, slides: 0, web: true };
+      ? { pptx: opts.deckName, goals: opts.goalsName, slides: deck.slides.length, usage }
+      : { pptx: null, goals: opts.goalsName, slides: 0, web: true, usage };
     const fallback = (opts.deckName ?? opts.goalsName)?.replace(/\.[^.]+$/, "") || "Nieuwe les";
     draft = normalizeDraft(raw as never, subjects, source, fallback);
   } catch { throw new GenError("invalid_json", "Er kwamen geen bruikbare kaarten uit. Probeer het opnieuw."); }

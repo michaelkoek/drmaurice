@@ -70,7 +70,7 @@ export function webCardsPrompt(input: { goals: string; goalsAsImage: boolean; im
   return `Je maakt flashcards voor een geneeskundestudent (Nederlandstalig) uit één les. De student krijgt later één toets over alle lessen. Er is GEEN presentatie; alleen de lesdoelen. Zoek de stof per lesdoel op met de zoekfunctie (web search) en maak daar kaarten van.
 
 HARDE REGELS
-1. Gebruik ALLEEN informatie uit pagina's die je met de zoekfunctie hebt gevonden en gelezen. Voeg geen kennis uit je geheugen toe en verzin geen antwoorden. Zoek gerust in het Engels; schrijf de kaarten in het Nederlands.
+1. Gebruik ALLEEN informatie uit pagina's die je met de zoekfunctie hebt gevonden en gelezen. Voeg geen kennis uit je geheugen toe en verzin geen antwoorden. Zoek gerust in het Engels; schrijf de kaarten in het Nederlands. Doe hooguit twee zoekopdrachten per lesdoel.
 2. Elk antwoord noemt in "bron" de naam van de site en de volledige URL van de pagina, bijvoorbeeld "StatPearls: https://www.ncbi.nlm.nih.gov/books/NBK…".
 3. Alle kaarten horen bij een lesdoel. Gebruik "lesdoel": 0 alleen voor noodzakelijke basiskennis die bij geen enkel lesdoel past, en hooguit voor enkele kaarten.
 4. Vind je voor een lesdoel (of een deel ervan) geen betrouwbare bron, maak dan precies één kaart met die vraag, "antwoord": null, en noem het in "ontbreekt". Zet de dekking van dat lesdoel op "deels" of "geen". "volledig" betekent: goed gedekt door de gevonden bronnen.
