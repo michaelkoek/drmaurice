@@ -10,10 +10,11 @@ const MIN_COVER = 0.03;
 const RENDER_SIDE = 1280;
 
 export async function parsePdf(file: Blob): Promise<ParsedDeck> {
-  // loaded on demand: pdf.js is large and needs browser APIs
-  const pdfjs = await import("pdfjs-dist");
+  // loaded on demand: pdf.js is large and needs browser APIs. The legacy build, because the modern
+  // one calls brand-new builtins (Map#getOrInsertComputed, Math.sumPrecise) that Safari lacks.
+  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
   if (!pdfjs.GlobalWorkerOptions.workerSrc) {
-    pdfjs.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/build/pdf.worker.min.mjs", import.meta.url).toString();
+    pdfjs.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/legacy/build/pdf.worker.min.mjs", import.meta.url).toString();
   }
   const doc = await pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
   const { OPS } = pdfjs;

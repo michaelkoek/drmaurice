@@ -1,6 +1,7 @@
 import "server-only";
 import OpenAI from "openai";
 import { currentUser } from "./auth";
+import { TRUSTED_DOMAINS, cardsSchema } from "./prompts";
 import type { Usage } from "./types";
 
 export function openai() {
@@ -9,10 +10,49 @@ export function openai() {
   return new OpenAI({ apiKey });
 }
 
-export function model(fast = false) {
-  const m = (fast && process.env.OPENAI_MODEL_FAST) || process.env.OPENAI_MODEL;
-  if (!m) throw new ApiError(500, "missing_model", "OPENAI_MODEL ontbreekt op de server.");
-  return m;
+type Effort = "none" | "low" | "medium" | "high";
+export interface TaskModel { model: string; effort: Effort }
+
+/**
+ * Model per task, cheapest that keeps quality. Luna is 20× cheaper than Sol but weaker at agentic work
+ * (web research). Compare a change with `npm run eval:models` before switching card writing.
+ */
+export const TASKS = {
+  pickImages: { model: "gpt-6-luna", effort: "none" },
+  cardsSlides: { model: "gpt-6.1-sol", effort: "low" },
+  cardsWeb: { model: "gpt-6.1-sol", effort: "low" },
+} as const satisfies Record<string, TaskModel>;
+
+/** Hard cap incl. reasoning tokens; 60 cards need well under half of this. */
+const MAX_OUTPUT_TOKENS = 24_000;
+
+/** Request for card writing, shared by /api/generate and scripts/compare-models.ts so both send the same thing. */
+export function cardsRequest(o: {
+  task: TaskModel; prompt: string; images: { dataUrl: string }[]; subjectKeys: string[];
+  web: boolean; goalCount: number; cacheKey: string;
+}) {
+  return {
+    model: o.task.model,
+    input: [{
+      role: "user" as const,
+      content: [
+        { type: "input_text" as const, text: o.prompt },
+        ...o.images.map((i) => ({ type: "input_image" as const, image_url: i.dataUrl, detail: "auto" as const })),
+      ],
+    }],
+    ...(o.web && {
+      tools: [{ type: "web_search" as const, filters: { allowed_domains: TRUSTED_DOMAINS }, search_context_size: "low" as const }],
+      // about two searches per learning goal
+      max_tool_calls: Math.min(40, Math.max(6, o.goalCount * 2)),
+    }),
+    // reasoning tokens are billed as output
+    reasoning: { effort: o.task.effort },
+    text: { format: { type: "json_schema" as const, name: "flashcards", schema: cardsSchema(o.subjectKeys), strict: true }, verbosity: "low" as const },
+    // same user + same upload = same prefix, so a retry is billed mostly at the cached rate
+    prompt_cache_key: o.cacheKey,
+    prompt_cache_retention: "24h" as const,
+    max_output_tokens: MAX_OUTPUT_TOKENS,
+  };
 }
 
 

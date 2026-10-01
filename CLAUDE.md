@@ -3,7 +3,7 @@
 Flashcard app for a Dutch medical student. Lecture `.pptx` or `.pdf` and/or learning goals (`.pages`/`.docx`/`.txt` or typed) → AI flashcards (goals only → researched on trusted medical sites) weighted toward the learning goals, grouped per exam and subject, practiced with a mountain-climb progress metaphor. UI language: **Dutch**. See README.md for setup and deploy.
 
 ## Stack
-Next.js 16 App Router (note: `proxy.ts`, not `middleware.ts`), React 19, Tailwind v4 (tokens in `app/globals.css`, use `bg-surface`, `text-muted`, `border-line` etc., never raw hex in components), Neon Postgres (`@neondatabase/serverless`) + Better Auth (email + password, sign-up at `/registreren` limited to `SIGNUP_ALLOWED_EMAILS`, no email so resets via `npm run user`), OpenAI Responses API with strict JSON schema, hosted on Vercel.
+Next.js 16 App Router (note: `proxy.ts`, not `middleware.ts`), React 19, Tailwind v4 (tokens in `app/globals.css`, use `bg-surface`, `text-muted`, `border-line` etc., never raw hex in components), Neon Postgres (`@neondatabase/serverless`) + Better Auth (email + password, sign-up at `/registreren` limited to `SIGNUP_ALLOWED_EMAILS`, no email so resets via `npm run user`), OpenAI Responses API with strict JSON schema (model + effort per task in `TASKS`, `lib/openai.ts`; compare before switching with `npm run eval:models`), hosted on Vercel.
 
 ## Rules that matter
 - **Never add knowledge to cards.** The prompt forbids facts not in the slides; missing answers become cards with `a: null` and a `gap`. Keep it that way; the student can fill gaps with own cards.

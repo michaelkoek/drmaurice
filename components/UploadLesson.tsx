@@ -38,7 +38,10 @@ export function UploadLesson({ examId }: { examId: string }) {
       const data = await parseDeck(file);
       if (!data.slides.length) throw new Error("empty");
       setDeck({ status: "ready", name: file.name, data });
-    } catch { setDeck({ status: "error", message: "Dit bestand kon niet gelezen worden. Controleer of het een PowerPoint (.pptx) of een pdf zonder wachtwoord is." }); }
+    } catch (e) {
+      console.error("parseDeck", e);
+      setDeck({ status: "error", message: "Dit bestand kon niet gelezen worden. Controleer of het een PowerPoint (.pptx) of een pdf zonder wachtwoord is." });
+    }
   }
   async function takeGoals(file: File) {
     if (!/\.(pages|docx|txt|md)$/i.test(file.name)) return setGoals({ status: "error", message: `${file.name} wordt niet ondersteund. Gebruik .pages, .docx of .txt.` });

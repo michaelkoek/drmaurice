@@ -47,8 +47,9 @@ Geef het tijdelijke wachtwoord door; de student wijzigt het na inloggen via **Wa
 | `BETTER_AUTH_URL` | | Publieke URL van de site (bv. `https://drmauricecards.vercel.app`) |
 | `SIGNUP_ALLOWED_EMAILS` | | E-mailadressen die mogen registreren, komma-gescheiden. Leeg = niemand |
 | `OPENAI_API_KEY` | platform.openai.com | **Alleen server.** Nooit met `NEXT_PUBLIC_` ervoor |
-| `OPENAI_MODEL` | | Een model dat afbeeldingen, structured outputs en de `web_search`-tool ondersteunt (voor lessen met alleen lesdoelen) |
-| `OPENAI_MODEL_FAST` | optioneel | Goedkoper model voor de afbeeldingskeuze; valt terug op `OPENAI_MODEL` |
+| `OPENAI_EVAL_DUMP` | optioneel, alleen lokaal | `1` = elke upload in `npm run dev` wordt bewaard in `.eval/inputs/` |
+
+Het model per taak staat vast in `TASKS` in `lib/openai.ts` (Luna voor de afbeeldingskeuze, Sol voor de kaarten). Wil je een goedkoper model proberen voor de kaarten? Upload een paar echte lessen met `OPENAI_EVAL_DUMP=1 npm run dev` en draai daarna `npm run eval:models` (eventueel met eigen modellen, zoals `npm run eval:models -- gpt-6-luna:low gpt-6.1-sol:low`). Per les komt er een HTML-vergelijking in `.eval/out/`. Dit kost echt OpenAI-tegoed.
 
 ## Naar GitHub en Vercel
 

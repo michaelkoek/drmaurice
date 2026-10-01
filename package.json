@@ -10,6 +10,7 @@
     "test": "vitest run",
     "verify": "npm run typecheck && npm test && npm run build",
     "user": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.local --conditions=react-server scripts/user.ts",
+    "eval:models": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.local --conditions=react-server scripts/compare-models.ts",
     "db:migrate": "node --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/migrate.mjs"
   },
   "dependencies": {

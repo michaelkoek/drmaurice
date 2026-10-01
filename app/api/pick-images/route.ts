@@ -1,4 +1,4 @@
-import { ApiError, errorResponse, logUsage, model, openai, requireUser, str } from "@/lib/openai";
+import { ApiError, errorResponse, TASKS, logUsage, openai, requireUser, str } from "@/lib/openai";
 import { pickImagesPrompt, pickImagesSchema } from "@/lib/prompts";
 
 export const maxDuration = 60;
@@ -12,12 +12,11 @@ export async function POST(req: Request) {
       id: String(c.id).slice(0, 12), slide: Number(c.slide) || 0, title: String(c.title ?? "").slice(0, 80), kb: Number(c.kb) || 0,
     })) : [];
     if (!candidates.length) throw new ApiError(400, "bad_request", "Geen afbeeldingen.");
-    const m = model(true);
+    const { model: m, effort } = TASKS.pickImages;
     const res = await openai().responses.create({
       model: m,
       input: pickImagesPrompt({ goals: str(body.goals, 8000), digest: str(body.digest, 40000), candidates, max }),
-      // choosing images needs no deliberation; reasoning tokens are billed as output
-      reasoning: { effort: "none" },
+      reasoning: { effort },
       text: { format: { type: "json_schema", name: "image_pick", schema: pickImagesSchema as unknown as Record<string, unknown>, strict: true }, verbosity: "low" },
       prompt_cache_key: user.id,
       prompt_cache_retention: "24h",
