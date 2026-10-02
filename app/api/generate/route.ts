@@ -1,13 +1,16 @@
 import { ApiError, TASKS, cardsRequest, checkImages, errorResponse, logUsage, openai, requireUser, str } from "@/lib/openai";
 import { cardsPrompt, webCardsPrompt, type SubjectRef } from "@/lib/prompts";
+import { researchGoals } from "@/lib/research";
 
 // Long lessons with images (or web research) can take a couple of minutes.
 export const maxDuration = 300;
 
 /**
  * Streams the model's JSON as plain text so the page can show progress; the page parses it at the end.
- * mode "web" = learning goals without a presentation: the model researches them with web search on TRUSTED_DOMAINS.
- * After the JSON, "\u0000USAGE" + the token usage is appended (see lib/generate.ts).
+ * mode "web" = learning goals without a presentation: the model researches them with web search on TRUSTED_DOMAINS
+ * (Dutch sites only, PRIORITY_DOMAINS first), Luna first and Sol only for badly covered goals (lib/research.ts).
+ * That JSON is sent in one piece at the end, preceded by "\u0001<status>\n" progress lines.
+ * After the JSON, "\u0000USAGE" + the token usage of every call (array) is appended (see lib/generate.ts).
  */
 export async function POST(req: Request) {
   type Ev = { type: string; delta?: string; response?: { error?: { message?: string }; usage?: Parameters<typeof logUsage>[2]; output?: { type: string }[] } };
@@ -29,9 +32,7 @@ export async function POST(req: Request) {
     const prompt = web
       ? webCardsPrompt({ goals, goalsAsImage, imageLabels, subjects })
       : cardsPrompt({ goals, goalsAsImage, digest: str(body.digest, 60000), imageLabels, subjects });
-    // web search budget (goals as an image: assume many)
-    const goalCount = goals.split("\n").filter((l) => l.trim()).length || 15;
-    const task = web ? TASKS.cardsWeb : TASKS.cardsSlides;
+    const task = TASKS.cardsSlides;
     m = task.model;
     meta = { mode: web ? "web" : "slides", images: images.length, chars: prompt.length };
     if (process.env.NODE_ENV !== "production" && process.env.OPENAI_EVAL_DUMP === "1") {
@@ -41,8 +42,9 @@ export async function POST(req: Request) {
       await writeFile(`.eval/inputs/${new Date().toISOString().replace(/[:.]/g, "-")}.json`,
         JSON.stringify({ mode: meta.mode, goals, goalsAsImage, digest: web ? "" : body.digest, images, subjects }));
     }
+    if (web) return researchResponse({ goals, goalsAsImage, images, imageLabels, subjects, cacheKey: user.id }, meta);
     stream = (await openai().responses.create({
-      ...cardsRequest({ task, prompt, images, subjectKeys: subjects.map((s) => s.key), web, goalCount, cacheKey: user.id }),
+      ...cardsRequest({ task, prompt, images, subjectKeys: subjects.map((s) => s.key), web: false, goalCount: 0, cacheKey: user.id }),
       stream: true,
     })) as unknown as typeof stream;
   } catch (e) {
@@ -63,12 +65,30 @@ export async function POST(req: Request) {
           else if (ev.type === "response.completed") {
             const searches = ev.response?.output?.filter((o) => o.type === "web_search_call").length ?? 0;
             const usage = logUsage("generate", m, ev.response?.usage, { ...meta, searches });
-            ctrl.enqueue(enc.encode("\u0000USAGE" + JSON.stringify(usage)));
+            ctrl.enqueue(enc.encode("\u0000USAGE" + JSON.stringify([usage])));
           }
         }
       } catch (e) {
         console.error(e);
         // the status is already sent; mark the failure in-band
+        ctrl.enqueue(enc.encode("\u0000ERROR"));
+      } finally {
+        ctrl.close();
+      }
+    },
+  });
+  return new Response(body, { headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" } });
+}
+
+function researchResponse(input: Parameters<typeof researchGoals>[0], meta: Record<string, unknown>) {
+  const enc = new TextEncoder();
+  const body = new ReadableStream<Uint8Array>({
+    async start(ctrl) {
+      try {
+        const { out, usage } = await researchGoals(input, (msg) => ctrl.enqueue(enc.encode("\u0001" + msg + "\n")), meta);
+        ctrl.enqueue(enc.encode(JSON.stringify(out) + "\u0000USAGE" + JSON.stringify(usage)));
+      } catch (e) {
+        console.error(e);
         ctrl.enqueue(enc.encode("\u0000ERROR"));
       } finally {
         ctrl.close();

@@ -2,12 +2,14 @@
  * Runs saved lessons through several models so card quality can be compared before switching TASKS in lib/openai.ts.
  *   1. OPENAI_EVAL_DUMP=1 npm run dev, upload a few real lessons (each lands in .eval/inputs/)
  *   2. npm run eval:models [model:effort ...]   default: gpt-6-luna:low gpt-6-luna:medium gpt-6.1-sol:low
+ *      "auto" = the production web flow (Luna, then Sol for weak goals; lib/research.ts), web lessons only
  *   3. open .eval/out/<lesson>.html: one column per model, cards grouped by learning goal
  * Costs real OpenAI credit (each lesson × each model). Reads OPENAI_API_KEY from .env.
  */
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { cardsRequest, logUsage, openai, type TaskModel } from "@/lib/openai";
 import { cardsPrompt, webCardsPrompt, type SubjectRef } from "@/lib/prompts";
+import { researchGoals } from "@/lib/research";
 import type { Usage } from "@/lib/types";
 
 /** $ per 1M tokens: input, cached input, output (reasoning is billed as output). Web search calls are not included. */
@@ -33,7 +35,21 @@ function cost(u: Usage) {
 
 const esc = (s: unknown) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
 
+async function runAuto(input: Input): Promise<Run> {
+  const t0 = Date.now();
+  const imageLabels = input.images.map((i, n) => `Afbeelding ${n + 1} = ${i.label}`);
+  try {
+    const { out, usage } = await researchGoals({ ...input, imageLabels, cacheKey: "eval" }, (msg) => console.log(`  auto: ${msg}`));
+    const sum = usage.reduce((a, u) => ({ ...a, input: a.input + u.input, cached: a.cached + u.cached, output: a.output + u.output, reasoning: a.reasoning + u.reasoning, searches: a.searches + u.searches }),
+      { model: usage.map((u) => u.model).join("+"), input: 0, cached: 0, output: 0, reasoning: 0, searches: 0 });
+    return { label: "auto", out, usage: sum, cost: usage.reduce((a, u) => a + cost(u), 0), seconds: (Date.now() - t0) / 1000 };
+  } catch (e) {
+    return { label: "auto", out: null, error: (e as Error).message, usage: null, cost: 0, seconds: (Date.now() - t0) / 1000 };
+  }
+}
+
 async function run(input: Input, task: TaskModel): Promise<Run> {
+  if (task.model === "auto") return input.mode === "web" ? runAuto(input) : { label: "auto", out: null, error: "alleen voor web-lessen", usage: null, cost: 0, seconds: 0 };
   const label = `${task.model}:${task.effort}`;
   const web = input.mode === "web";
   const imageLabels = input.images.map((i, n) => `Afbeelding ${n + 1} = ${i.label}`);

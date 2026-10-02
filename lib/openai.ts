@@ -15,12 +15,14 @@ export interface TaskModel { model: string; effort: Effort }
 
 /**
  * Model per task, cheapest that keeps quality. Luna is 20× cheaper than Sol but weaker at agentic work
- * (web research). Compare a change with `npm run eval:models` before switching card writing.
+ * (web research), so web research runs Luna first and only redoes badly covered goals with Sol (lib/research.ts).
+ * Compare a change with `npm run eval:models` before switching card writing.
  */
 export const TASKS = {
   pickImages: { model: "gpt-6-luna", effort: "none" },
   cardsSlides: { model: "gpt-6.1-sol", effort: "low" },
-  cardsWeb: { model: "gpt-6.1-sol", effort: "low" },
+  cardsWeb: { model: "gpt-6-luna", effort: "low" },
+  cardsWebRedo: { model: "gpt-6.1-sol", effort: "low" },
 } as const satisfies Record<string, TaskModel>;
 
 /** Hard cap incl. reasoning tokens; 60 cards need well under half of this. */
@@ -42,8 +44,8 @@ export function cardsRequest(o: {
     }],
     ...(o.web && {
       tools: [{ type: "web_search" as const, filters: { allowed_domains: TRUSTED_DOMAINS }, search_context_size: "low" as const }],
-      // about two searches per learning goal
-      max_tool_calls: Math.min(40, Math.max(6, o.goalCount * 2)),
+      // up to three searches per learning goal (priority sites, then the fallback list)
+      max_tool_calls: Math.min(45, Math.max(6, o.goalCount * 3)),
     }),
     // reasoning tokens are billed as output
     reasoning: { effort: o.task.effort },

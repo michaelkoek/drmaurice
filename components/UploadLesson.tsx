@@ -10,7 +10,7 @@ import type { Draft } from "@/lib/types";
 import { Btn, Chip, Field, Panel, inputCls, toast } from "./ui";
 
 const STEPS: [StepKey, string][] = [["read", "Bestanden gelezen"], ["pick", "Afbeeldingen met leerstof kiezen"], ["write", "Flashcards schrijven"], ["check", "Controleren"]];
-// no presentation: the AI researches the learning goals on trusted medical sites
+// no presentation: the AI researches the learning goals on trusted Dutch sites (Hartstichting, EHBO Nederland, Rode Kruis first)
 const WEB_STEPS: [StepKey, string][] = [["read", "Lesdoelen gelezen"], ["write", "Bronnen zoeken en flashcards schrijven"], ["check", "Controleren"]];
 
 type SlotState<T> = { status: "empty" } | { status: "reading"; name: string } | { status: "ready"; name: string; data: T } | { status: "error"; message: string };
@@ -94,7 +94,7 @@ export function UploadLesson({ examId }: { examId: string }) {
       <Link href={`/?examen=${examId}`} className="text-sm font-semibold text-muted hover:text-ink">← Dashboard</Link>
       <div>
         <h1 className="font-display text-3xl font-bold">Nieuwe les toevoegen</h1>
-        <p className="max-w-[66ch] text-muted">Upload de PowerPoint of pdf van de les en het document met lesdoelen; één van de twee is ook genoeg. De AI maakt er flashcards van, legt de nadruk op de lesdoelen en zet de les bij het juiste vak. Heb je alleen lesdoelen, dan zoekt de AI de stof op betrouwbare medische websites. Je controleert alles voordat je opslaat.</p>
+        <p className="max-w-[66ch] text-muted">Upload de PowerPoint of pdf van de les en het document met lesdoelen; één van de twee is ook genoeg. De AI maakt er flashcards van, legt de nadruk op de lesdoelen en zet de les bij het juiste vak. Heb je alleen lesdoelen, dan zoekt de AI de stof op betrouwbare Nederlandse websites, eerst bij de Hartstichting, EHBO Nederland en het Rode Kruis. Je controleert alles voordat je opslaat.</p>
       </div>
       <div className="grid gap-3.5 sm:grid-cols-2">
         <Slot id="pptx" badge={deck.status === "ready" && deck.data.kind === "pdf" ? "PDF" : "PPTX"} badgeColor="#c8553d" title="Presentatie van de les" hint="Sleep het .pptx- of .pdf-bestand hierheen of tik om te kiezen." accept=".pptx,.pdf,application/pdf"
@@ -127,7 +127,7 @@ export function UploadLesson({ examId }: { examId: string }) {
         <Btn variant="primary" disabled={(!deckReady && !hasGoals) || running} onClick={generate}>Maak flashcards</Btn>
         <span className="text-[13px] text-muted">{
           !deckReady && !hasGoals ? "Kies een presentatie, lesdoelen of allebei."
-          : !deckReady ? "Geen presentatie: de AI zoekt de stof op betrouwbare medische websites en noemt per kaart de bron. Dit duurt meestal 2 tot 4 minuten."
+          : !deckReady ? "Geen presentatie: de AI zoekt de stof op betrouwbare Nederlandse websites en noemt per kaart de bron. Dit duurt meestal 2 tot 4 minuten."
           : !hasGoals ? "Klaar om te maken. Tip: voeg de lesdoelen toe voor betere kaarten."
           : "Klaar. Dit duurt meestal 1 tot 3 minuten."}</span>
       </div>
@@ -220,7 +220,7 @@ function Review({ draft, setDraft, subjects, onSave, onDiscard }: { draft: Draft
           {byG(0) > 0 && <div className="grid grid-cols-[40px_1fr_auto] gap-2 text-sm"><span className="font-mono text-xs text-hema">—</span><span>Buiten de lesdoelen <Chip tone="extra">Lage prioriteit</Chip></span><span className="font-mono text-xs text-muted">{byG(0)} kaarten</span></div>}
         </div>
       ) : <p className="text-[13px] text-muted">Geen lesdoelen gebruikt: {draft.cards.length} kaarten over de hele presentatie.</p>}
-      {web && <p className="text-[13px] text-muted">Deze kaarten komen van betrouwbare medische websites, niet uit een presentatie. Elke kaart noemt de bron; controleer twijfelgevallen via de link.</p>}
+      {web && <p className="text-[13px] text-muted">Deze kaarten komen van betrouwbare Nederlandse websites, niet uit een presentatie. Elke kaart noemt de bron; controleer twijfelgevallen via de link.</p>}
       {(draft.findings.gaps.length > 0 || draft.findings.conflicts.length > 0) && (
         <div className="grid gap-2 text-sm">
           {draft.findings.gaps.length > 0 && <><h3 className="font-semibold">{web ? "Niet gevonden in bronnen" : "Ontbreekt in de presentatie"}</h3><ol className="grid list-decimal gap-1 pl-5">{draft.findings.gaps.map((x, i) => <li key={i} className="rich" dangerouslySetInnerHTML={{ __html: clean(x) }} />)}</ol></>}

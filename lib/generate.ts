@@ -81,13 +81,15 @@ export async function generateLesson(opts: {
     const { done, value } = await reader.read();
     if (done) break;
     text += dec.decode(value, { stream: true });
+    // web research: "\u0001<status>\n" progress lines before the JSON
+    text = text.replace(/\u0001([^\n]*)\n/g, (_, msg: string) => { onStep("write", "on", msg); return ""; });
     const m = (text.match(/"vraag"\s*:/g) || []).length;
     if (m !== n) { n = m; onStep("write", "on", `${n} ${n === 1 ? "kaart" : "kaarten"} geschreven…`); }
   }
-  // the server appends "\u0000USAGE{…}" after the JSON
+  // the server appends "\u0000USAGE[…]" (one entry per OpenAI call) after the JSON
   const cut = text.indexOf("\u0000USAGE");
   if (cut >= 0) {
-    try { usage.push(JSON.parse(text.slice(cut + 6))); } catch { /* usage is optional */ }
+    try { usage.push(...[JSON.parse(text.slice(cut + 6))].flat()); } catch { /* usage is optional */ }
     text = text.slice(0, cut);
   }
   if (text.includes("\u0000ERROR")) throw new GenError("upstream_error", "Het schrijven van de kaarten is afgebroken. Probeer het opnieuw.");
