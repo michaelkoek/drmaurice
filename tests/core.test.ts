@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { snappyUncompress } from "@/lib/parse";
-import { normalizeDraft, MISSING, MISSING_WEB } from "@/lib/normalize";
+import { manualDraft, normalizeDraft, MISSING, MISSING_WEB } from "@/lib/normalize";
 import { cardsPrompt, webCardsPrompt } from "@/lib/prompts";
 import { cardsOf, dailyTarget, daysUntil, lessonStats } from "@/lib/stats";
 import { plainToHtml, escapeHtml } from "@/lib/sanitize";
@@ -59,6 +59,13 @@ describe("own cards", () => {
     const cards = cardsOf(l, [own({ id: "o1", replaces: "c0" }), own({ id: "o2" }), own({ id: "o3", lesson_id: "other" })]);
     expect(cards.map((c) => c.id)).toEqual(["c1", "o1", "o2"]);
     expect(cards.find((c) => c.id === "o1")?.own).toBe(true);
+  });
+  it("makes an empty manual lesson that counts all own cards", () => {
+    const draft = manualDraft("  Hart  ", "s-pat");
+    expect(draft).toMatchObject({ name: "Hart", subjectId: "s-pat", goals: [], cards: [], source: { manual: true, pptx: null } });
+    const l = lesson(draft.cards, draft.goals);
+    const cards = cardsOf(l, [own({ id: "o1", goal: 0 }), own({ id: "o2", goal: 0 })]);
+    expect(lessonStats(l, cards, { lesson_id: "L", mastered: ["o1"], first_try: { o1: true }, last_studied_at: null })).toEqual({ total: 2, done: 1, score: 100 });
   });
 });
 

@@ -10,6 +10,11 @@ interface Raw {
 export const MISSING = "Dit staat niet in de presentatie. Zoek het op in het studiemateriaal.";
 export const MISSING_WEB = "Hiervoor is geen betrouwbare bron gevonden. Zoek het op in het studiemateriaal.";
 
+/** An empty lesson without goals or AI cards; the student fills it with own cards. */
+export function manualDraft(name: string, subjectId: string | null): Draft {
+  return { name: name.trim(), subjectId, why: "", goals: [], cards: [], findings: { gaps: [], conflicts: [] }, source: { pptx: null, goals: null, slides: 0, manual: true } };
+}
+
 /** Model JSON → a draft lesson. Subjects are sent as keys v0..v5 in position order. */
 export function normalizeDraft(o: Raw, subjects: Subject[], source: Draft["source"], fallbackName: string): Draft {
   if (!o || !Array.isArray(o.kaarten)) throw new Error("invalid_json");

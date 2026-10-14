@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { useData, useExamView } from "@/lib/data";
 import { GenError, generateLesson, type StepKey, type StepState } from "@/lib/generate";
+import { manualDraft } from "@/lib/normalize";
 import { DECK_EXT, parseDeck, parseGoals, type ParsedDeck, type ParsedGoals } from "@/lib/parse";
 import { clean } from "@/lib/sanitize";
 import type { Draft } from "@/lib/types";
@@ -27,6 +28,9 @@ export function UploadLesson({ examId }: { examId: string }) {
   const [running, setRunning] = useState(false);
   const [draft, setDraft] = useState<Draft | null>(null);
   const ctl = useRef<AbortController | null>(null);
+  const [manualName, setManualName] = useState("");
+  const [manualSub, setManualSub] = useState("");
+  const [manualBusy, setManualBusy] = useState(false);
 
   if (!d.ready) return <p className="py-20 text-center text-muted">Laden…</p>;
   if (!exam) return <Panel className="p-6">Deze toets bestaat niet. <Link className="underline" href="/">Naar dashboard</Link></Panel>;
@@ -89,12 +93,22 @@ export function UploadLesson({ examId }: { examId: string }) {
     router.push(go ? `/les/${l.id}` : `/?examen=${examId}`);
   }
 
+  async function createManual() {
+    if (!manualName.trim()) return;
+    setManualBusy(true);
+    try {
+      const l = await d.createLesson(examId, manualDraft(manualName, manualSub || subjects[0]?.id || null));
+      toast(`${l.name} aangemaakt`);
+      router.push(`/les/${l.id}`);
+    } catch { setManualBusy(false); }
+  }
+
   return (
     <section className="mx-auto grid max-w-[900px] gap-[18px]">
       <Link href={`/?examen=${examId}`} className="text-sm font-semibold text-muted hover:text-ink">← Dashboard</Link>
       <div>
         <h1 className="font-display text-3xl font-bold">Nieuwe les toevoegen</h1>
-        <p className="max-w-[66ch] text-muted">Upload de PowerPoint of pdf van de les en het document met lesdoelen; één van de twee is ook genoeg. De AI maakt er flashcards van, legt de nadruk op de lesdoelen en zet de les bij het juiste vak. Heb je alleen lesdoelen, dan zoekt de AI de stof op betrouwbare Nederlandse websites, eerst bij de Hartstichting, EHBO Nederland en het Rode Kruis. Je controleert alles voordat je opslaat.</p>
+        <p className="max-w-[66ch] text-muted">Upload de PowerPoint of pdf van de les en het document met lesdoelen; één van de twee is ook genoeg. De AI maakt er flashcards van, legt de nadruk op de lesdoelen en zet de les bij het juiste vak. Heb je alleen lesdoelen, dan zoekt de AI de stof op betrouwbare Nederlandse websites, eerst bij de Hartstichting, EHBO Nederland en het Rode Kruis. Je controleert alles voordat je opslaat. Liever zelf kaarten maken? Dat kan onderaan, zonder presentatie of lesdoelen.</p>
       </div>
       <div className="grid gap-3.5 sm:grid-cols-2">
         <Slot id="pptx" badge={deck.status === "ready" && deck.data.kind === "pdf" ? "PDF" : "PPTX"} badgeColor="#c8553d" title="Presentatie van de les" hint="Sleep het .pptx- of .pdf-bestand hierheen of tik om te kiezen." accept=".pptx,.pdf,application/pdf"
@@ -151,6 +165,24 @@ export function UploadLesson({ examId }: { examId: string }) {
       )}
 
       {draft && <Review draft={draft} setDraft={setDraft} subjects={subjects} onSave={save} onDiscard={() => { setDraft(null); setSteps(null); }} />}
+
+      {!steps && (
+        <Panel className="grid gap-4 p-5">
+          <div>
+            <h2 className="font-display text-lg font-bold">Zelf kaarten maken</h2>
+            <p className="text-[13px] text-muted">Geen presentatie of lesdoelen nodig: je typt de vragen en antwoorden zelf. De AI doet hier niets.</p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Naam van de les"><input id="manual-name" className={inputCls} value={manualName} maxLength={120} placeholder="Bijv. Anatomie van het hart" onChange={(e) => setManualName(e.target.value)} /></Field>
+            <Field label="Vak">
+              <select id="manual-subject" className={inputCls} value={manualSub || subjects[0]?.id || ""} onChange={(e) => setManualSub(e.target.value)}>
+                {subjects.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            </Field>
+          </div>
+          <div><Btn disabled={manualBusy || !manualName.trim()} onClick={createManual}>Les aanmaken</Btn></div>
+        </Panel>
+      )}
     </section>
   );
 }

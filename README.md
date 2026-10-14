@@ -7,7 +7,7 @@ Flashcards uit colleges voor een geneeskundestudent. Upload de PowerPoint of pdf
 ## Hoe het werkt
 
 1. **Toets & vakken.** De student maakt een toets (naam, datum, aantal vragen) met 1–6 vakken. Elk vak is een graat op de berg.
-2. **Les toevoegen.** `.pptx` of `.pdf` + lesdoelen (`.pages`, `.docx` of `.txt`) worden **in de browser** uitgelezen (`lib/parse.ts`, `lib/pdf.ts`). Er gaat alleen tekst en maximaal 8 verkleinde afbeeldingen naar de server.
+2. **Les toevoegen.** `.pptx` of `.pdf` + lesdoelen (`.pages`, `.docx` of `.txt`) worden **in de browser** uitgelezen (`lib/parse.ts`, `lib/pdf.ts`). Er gaat alleen tekst en maximaal 8 verkleinde afbeeldingen naar de server. Of kies "Zelf kaarten maken": een lege les zonder AI, die je vult met eigen kaarten.
 3. **Twee AI-stappen** (`app/api/*`, sleutel alleen op de server):
    - `pick-images` kiest welke slide-afbeeldingen leerstof bevatten (schema's, tabellen).
    - `generate` schrijft de kaarten als JSON met een strikt schema en streamt de tekst terug zodat de pagina kan laten zien hoeveel kaarten er al zijn.

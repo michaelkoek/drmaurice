@@ -42,7 +42,8 @@ export function Mountain({ subjects, lessons, activeSubjectId }: { subjects: Sub
   });
   const point = (i: number, frac: number) => refs.current[i]?.getPointAtLength((lens[i] ?? 0) * frac) ?? { x: SUMMIT.x, y: SUMMIT.y };
   const act = ridges.find((r) => r.s.id === activeSubjectId) ?? ridges[0];
-  const allDone = lessons.length > 0 && lessons.every((l) => l.total > 0 && l.done >= l.total);
+  // empty lessons (a manual lesson without cards yet) don't block the summit
+  const allDone = lessons.some((l) => l.total > 0) && lessons.every((l) => !l.total || l.done >= l.total);
 
   return (
     <div>

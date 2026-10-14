@@ -26,6 +26,7 @@ export function Study({ lessonId }: { lessonId: string }) {
   const [gains, setGains] = useState<{ id: number; at: number }[]>([]);
   const [sureReset, setSureReset] = useState(false);
   const built = useRef(false);
+  const opened = useRef(false);
 
   const goals = lesson?.goals ?? [];
   const activeSet = active ?? new Set(goals.map((g) => g.id));
@@ -82,6 +83,9 @@ export function Study({ lessonId }: { lessonId: string }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [flip, next, idx, deck.length]);
 
+  // a lesson without cards (a new manual lesson) opens straight into the card form
+  useEffect(() => { if (lesson && !opened.current) { opened.current = true; if (!cards.length) setForm({ mode: "add" }); } }, [lesson, cards.length]);
+
   useEffect(() => { if (!gains.length) return; const t = setTimeout(() => setGains((g) => g.slice(1)), 1400); return () => clearTimeout(t); }, [gains]);
 
   if (!d.ready) return <p className="py-20 text-center text-muted">Laden…</p>;
@@ -92,10 +96,12 @@ export function Study({ lessonId }: { lessonId: string }) {
   const pct = scope.length ? (doneInScope / scope.length) * 100 : 0;
   const left = scope.length - doneInScope;
   const goal = current ? goals.find((g) => g.id === current.g) : undefined;
-  const label = current && current.g && goal ? `LD${current.g} · ${goal.t}` : "Buiten de lesdoelen";
+  const label = !goals.length ? lesson.name : current && current.g && goal ? `LD${current.g} · ${goal.t}` : "Buiten de lesdoelen";
+  const offGoal = !!current && !current.g && goals.length > 0;
   const own = d.own.filter((o) => o.lesson_id === lessonId);
   const hasExtra = cards.some((c) => c.g === 0) && goals.length > 0;
   const web = !!lesson.source?.web;
+  const manual = !!lesson.source?.manual;
   const started = progress.mastered.length > 0 || Object.keys(progress.first_try).length > 0;
 
   return (
@@ -122,23 +128,23 @@ export function Study({ lessonId }: { lessonId: string }) {
             <span className="absolute -right-3 -top-[15px] h-4 w-3 border-l-[1.5px] border-muted"><span className="absolute left-0 top-0 border-y-[3.5px] border-l-[9px] border-y-transparent" style={{ borderLeftColor: color }} /></span>
             {gains.map((g) => <span key={g.id} className="gain absolute -top-6 whitespace-nowrap font-mono text-xs" style={{ left: `calc(${g.at}% - 14px)` }}>+{METERS_PER_CARD} m</span>)}
           </div>
-          <span className="whitespace-nowrap text-[13px] tabular-nums text-muted">{left ? <><b className="font-semibold text-ink">{(left * METERS_PER_CARD).toLocaleString("nl-NL")} m</b> tot basiskamp</> : <b className="font-semibold text-ink">Basiskamp bereikt</b>}</span>
+          <span className="whitespace-nowrap text-[13px] tabular-nums text-muted">{left ? <><b className="font-semibold text-ink">{(left * METERS_PER_CARD).toLocaleString("nl-NL")} m</b> tot basiskamp</> : <b className="font-semibold text-ink">{scope.length ? "Basiskamp bereikt" : "Nog geen kaarten"}</b>}</span>
         </div>
       </div>
 
-      {form && <OwnCardForm key={form.mode + ("card" in form ? form.card.id : "")} ctx={form} lessonId={lessonId} goals={goals} web={web} onClose={() => setForm(null)} />}
+      {form && <OwnCardForm key={form.mode + ("card" in form ? form.card.id : "")} ctx={form} lessonId={lessonId} goals={goals} web={web} manual={manual} onClose={() => setForm(null)} />}
 
       {current ? (
         <>
           <div className="flip-card cursor-pointer rounded-[20px]" data-flipped={flipped} onClick={flip} role="button" tabIndex={0} aria-label="Kaart omdraaien" id="card">
             <div className="flip-inner min-h-[380px]">
               <Face>
-                <Meta label={label} x={!current.g}>{current.own && <Chip tone="own">Eigen kaart</Chip>}</Meta>
+                <Meta label={label} x={offGoal}>{current.own && !manual && <Chip tone="own">Eigen kaart</Chip>}</Meta>
                 <div className="my-auto font-display text-[clamp(22px,3vw,30px)] font-medium leading-snug text-balance">{current.q}</div>
                 <div className="text-xs text-muted">Tik of druk op spatie voor het antwoord</div>
               </Face>
               <Face back>
-                <Meta label={label} x={!current.g}>{current.own && <Btn variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setForm({ mode: "edit", card: current }); }}>Bewerken</Btn>}</Meta>
+                <Meta label={label} x={offGoal}>{current.own && <Btn variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setForm({ mode: "edit", card: current }); }}>Bewerken</Btn>}</Meta>
                 {current.a && <div className="rich my-auto text-lg leading-relaxed" dangerouslySetInnerHTML={{ __html: clean(current.a) }} />}
                 {current.gap && (
                   <div className="rounded-lg bg-eosin-soft px-2.5 py-2 text-[13px] text-eosin">
@@ -160,6 +166,12 @@ export function Study({ lessonId }: { lessonId: string }) {
           </div>
           <p className="text-center text-xs text-faint">Spatie draait om · ← → bladeren</p>
         </>
+      ) : !cards.length ? (
+        <Panel className="grid justify-items-start gap-3.5 px-5 py-7 sm:px-8">
+          <div className="font-display text-[22px] font-bold leading-tight">Nog geen kaarten in deze les</div>
+          <p className="text-muted">Maak je eigen flashcards: typ een vraag en het antwoord. Elke kaart is {METERS_PER_CARD} hoogtemeters op weg naar het basiskamp.</p>
+          {!form && <Btn variant="primary" onClick={() => setForm({ mode: "add" })}>+ Eerste kaart toevoegen</Btn>}
+        </Panel>
       ) : (
         <Summary lessonName={lesson.name} scope={scope} goals={goals.filter((g) => activeSet.has(g.id))} cards={cards} firstTry={progress.first_try}
           onDash={() => router.push(`/?examen=${lesson.exam_id}`)} onRedo={restart} />
@@ -180,12 +192,12 @@ export function Study({ lessonId }: { lessonId: string }) {
         </Drawer>
       )}
 
-      <Drawer title="Bronnotities" meta={`${lesson.findings.gaps.length} ${lesson.findings.gaps.length === 1 ? "gat" : "gaten"}, ${lesson.findings.conflicts.length} ${lesson.findings.conflicts.length === 1 ? "tegenstrijdigheid" : "tegenstrijdigheden"}`}>
+      {!manual && <Drawer title="Bronnotities" meta={`${lesson.findings.gaps.length} ${lesson.findings.gaps.length === 1 ? "gat" : "gaten"}, ${lesson.findings.conflicts.length} ${lesson.findings.conflicts.length === 1 ? "tegenstrijdigheid" : "tegenstrijdigheden"}`}>
         <h3 className="text-sm font-semibold">{web ? "Niet gevonden in bronnen" : "Ontbreekt in de presentatie"}</h3>
         {lesson.findings.gaps.length ? <ol className="grid list-decimal gap-1.5 pl-5 text-sm">{lesson.findings.gaps.map((x, i) => <li key={i} className="rich" dangerouslySetInnerHTML={{ __html: clean(x) }} />)}</ol> : <p className="text-sm text-muted">Niets gevonden.</p>}
         <h3 className="text-sm font-semibold">Tegenstrijdig in de bron</h3>
         {lesson.findings.conflicts.length ? <ol className="grid list-decimal gap-1.5 pl-5 text-sm">{lesson.findings.conflicts.map((x, i) => <li key={i} className="rich" dangerouslySetInnerHTML={{ __html: clean(x) }} />)}</ol> : <p className="text-sm text-muted">Niets gevonden.</p>}
-      </Drawer>
+      </Drawer>}
 
       <Drawer title="Mijn kaarten" meta={String(own.length)}>
         {own.length ? own.map((o) => {
@@ -194,11 +206,11 @@ export function Study({ lessonId }: { lessonId: string }) {
             <div key={o.id} className="grid gap-1 rounded-[10px] border border-line px-3 py-2.5 text-sm">
               <span className="font-semibold">{o.question}</span>
               <span className="rich text-muted" dangerouslySetInnerHTML={{ __html: clean(o.answer_html) }} />
-              <span className="font-mono text-[11.5px] text-faint">{o.goal ? `LD${o.goal}` : "buiten lesdoelen"} · {o.source}{o.replaces ? " · vervangt een AI-kaart" : ""}</span>
+              <span className="font-mono text-[11.5px] text-faint">{goals.length ? `${o.goal ? `LD${o.goal}` : "buiten lesdoelen"} · ` : ""}{o.source}{o.replaces ? " · vervangt een AI-kaart" : ""}</span>
               <span><Btn variant="ghost" size="sm" onClick={() => setForm({ mode: "edit", card })}>Bewerken</Btn></span>
             </div>
           );
-        }) : <p className="text-sm text-muted">Nog geen eigen kaarten. Gebruik &quot;+ Kaart toevoegen&quot; voor stof die ontbreekt.</p>}
+        }) : <p className="text-sm text-muted">Nog geen eigen kaarten. Gebruik &quot;+ Kaart toevoegen&quot;{manual ? "." : " voor stof die ontbreekt."}</p>}
       </Drawer>
 
       <LessonSettings lessonId={lessonId} />
@@ -257,7 +269,7 @@ function Summary({ lessonName, scope, goals, cards, firstTry, onDash, onRedo }: 
   );
 }
 
-function OwnCardForm({ ctx, lessonId, goals, web, onClose }: { ctx: FormCtx; lessonId: string; goals: { id: number; t: string }[]; web: boolean; onClose: () => void }) {
+function OwnCardForm({ ctx, lessonId, goals, web, manual, onClose }: { ctx: FormCtx; lessonId: string; goals: { id: number; t: string }[]; web: boolean; manual: boolean; onClose: () => void }) {
   const d = useData();
   const src = ctx.mode === "add" ? null : ctx.card;
   const [q, setQ] = useState(src?.q ?? "");
@@ -270,7 +282,8 @@ function OwnCardForm({ ctx, lessonId, goals, web, onClose }: { ctx: FormCtx; les
   const box = useRef<HTMLFormElement>(null);
   useEffect(() => { box.current?.scrollIntoView({ block: "start", behavior: "smooth" }); (ctx.mode === "fill" ? box.current?.querySelector<HTMLTextAreaElement>("#cf-a") : box.current?.querySelector<HTMLTextAreaElement>("#cf-q"))?.focus(); }, [ctx.mode]);
 
-  async function submit(e: React.FormEvent) {
+  // `more`: keep the form open for the next card (add mode), keeping goal and source
+  async function submit(e: React.FormEvent, more = false) {
     e.preventDefault();
     if (!q.trim()) return setError("Vul een vraag in.");
     if (!a.trim()) return setError("Vul een antwoord in.");
@@ -278,14 +291,16 @@ function OwnCardForm({ ctx, lessonId, goals, web, onClose }: { ctx: FormCtx; les
     try {
       await d.saveOwnCard({ id: ctx.mode === "edit" ? ctx.card.id : undefined, lessonId, goal: goals.length ? Number(g) : 0, question: q.trim(), answer: a.trim(), source: ref.trim(), replaces: ctx.mode === "fill" ? ctx.card.id : null });
       toast(ctx.mode === "edit" ? "Kaart bijgewerkt" : ctx.mode === "fill" ? "Antwoord toegevoegd" : "Kaart toegevoegd");
-      onClose();
+      if (!more) return onClose();
+      setQ(""); setA(""); setBusy(false);
+      box.current?.querySelector<HTMLTextAreaElement>("#cf-q")?.focus();
     } catch { setBusy(false); }
   }
 
   return (
     <form ref={box} onSubmit={submit} noValidate className="grid gap-3 rounded-2xl border border-line bg-surface p-5">
       <h2 className="font-display text-lg font-bold">{ctx.mode === "edit" ? "Eigen kaart bewerken" : ctx.mode === "fill" ? "Antwoord zelf invullen" : "Eigen kaart toevoegen"}</h2>
-      <p className="text-[13px] text-muted">{ctx.mode === "fill" ? `${web ? "Hiervoor is geen betrouwbare bron gevonden" : "Dit stond niet in de presentatie"}. Vul het antwoord in uit de reader of je aantekeningen; jouw kaart vervangt deze.` : "Voor stof die de AI heeft gemist, of die je uit de reader of je aantekeningen haalt."}</p>
+      <p className="text-[13px] text-muted">{ctx.mode === "fill" ? `${web ? "Hiervoor is geen betrouwbare bron gevonden" : "Dit stond niet in de presentatie"}. Vul het antwoord in uit de reader of je aantekeningen; jouw kaart vervangt deze.` : manual ? "Typ een vraag en het antwoord, bijvoorbeeld uit de reader of je aantekeningen." : "Voor stof die de AI heeft gemist, of die je uit de reader of je aantekeningen haalt."}</p>
       <Field label="Vraag"><textarea id="cf-q" rows={2} className={inputCls} value={q} maxLength={1000} onChange={(e) => { setQ(e.target.value); setError(null); }} /></Field>
       <Field label="Antwoord"><textarea id="cf-a" rows={4} className={inputCls} value={a} maxLength={5000} placeholder="Begin een regel met - voor een opsomming" onChange={(e) => { setA(e.target.value); setError(null); }} /></Field>
       <div className="grid gap-3 sm:grid-cols-2">
@@ -302,6 +317,7 @@ function OwnCardForm({ ctx, lessonId, goals, web, onClose }: { ctx: FormCtx; les
       {error && <p className="text-[13px] text-eosin" role="alert">{error}</p>}
       <div className="flex flex-wrap items-center gap-2.5">
         <Btn variant="primary" type="submit" disabled={busy}>Opslaan</Btn>
+        {ctx.mode === "add" && <Btn type="button" disabled={busy} onClick={(e) => submit(e, true)}>Opslaan en volgende</Btn>}
         <Btn type="button" onClick={onClose}>Annuleren</Btn>
         <span className="flex-1" />
         {ctx.mode === "edit" && (
