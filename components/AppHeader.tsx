@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useData } from "@/lib/data";
 
 export function AppHeader() {
-  const { email, signOut } = useData();
+  const { email, admin, signOut } = useData();
   return (
     <header className="mb-5 flex items-center justify-between gap-3 py-2">
       <Link href="/" className="flex items-center gap-2 font-display text-lg font-bold">
@@ -11,6 +11,8 @@ export function AppHeader() {
       </Link>
       <div className="flex items-center gap-3 text-[13px] text-muted">
         <span className="hidden sm:inline">{email}</span>
+        {admin && <Link href="/beheer" className="rounded-lg px-2 py-1 font-semibold hover:text-ink">Beheer</Link>}
+        <Link href="/feedback" className="rounded-lg px-2 py-1 font-semibold hover:text-ink">Feedback</Link>
         <Link href="/wachtwoord" className="rounded-lg px-2 py-1 font-semibold hover:text-ink">Wachtwoord</Link>
         <button onClick={signOut} className="rounded-lg px-2 py-1 font-semibold hover:text-ink">Uitloggen</button>
       </div>

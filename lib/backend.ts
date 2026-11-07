@@ -1,7 +1,7 @@
 import { authClient } from "./auth-client";
 import type { Exam, Lesson, OwnCard, Progress, Subject } from "./types";
 
-export interface Snapshot { email: string | null; exams: Exam[]; subjects: Subject[]; lessons: Lesson[]; own: OwnCard[]; progress: Progress[] }
+export interface Snapshot { email: string | null; admin: boolean; exams: Exam[]; subjects: Subject[]; lessons: Lesson[]; own: OwnCard[]; progress: Progress[] }
 type Table = "exams" | "subjects" | "lessons" | "own_cards";
 
 /** Everything the app reads or writes goes through here. */
@@ -18,6 +18,8 @@ async function api<T>(init?: { body: Record<string, unknown> }): Promise<T> {
   const res = await fetch("/api/data", init ? { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(init.body) } : undefined);
   // the proxy only checks that a session cookie exists; an expired one lands here
   if (res.status === 401) { window.location.href = "/login"; return new Promise<never>(() => {}); }
+  // signed in but not paid (the layout normally catches this first)
+  if (res.status === 402) { window.location.href = "/betalen"; return new Promise<never>(() => {}); }
   const json = await res.json().catch(() => ({}));
   if (!res.ok) throw json; // { code, message }, e.g. code "23503" for a foreign-key violation
   return json as T;
@@ -37,7 +39,7 @@ function memoryBackend(): Backend {
   const db: Record<string, Record<string, unknown>[]> = { exams: [], subjects: [], lessons: [], own_cards: [], progress: [] };
   (globalThis as unknown as { __dmcDb: typeof db }).__dmcDb = db;
   return {
-    async load() { const c = structuredClone(db); return { email: "test@example.com", exams: c.exams, subjects: c.subjects, lessons: c.lessons, own: c.own_cards, progress: c.progress } as unknown as Snapshot; },
+    async load() { const c = structuredClone(db); return { email: "test@example.com", admin: false, exams: c.exams, subjects: c.subjects, lessons: c.lessons, own: c.own_cards, progress: c.progress } as unknown as Snapshot; },
     async insert(table, row) { const r = { id: crypto.randomUUID(), created_at: new Date().toISOString(), ...row }; db[table].push(r); return structuredClone(r) as never; },
     async update(table, id, patch) { const r = db[table].find((x) => x.id === id); if (r) Object.assign(r, patch); },
     async remove(table, id) {

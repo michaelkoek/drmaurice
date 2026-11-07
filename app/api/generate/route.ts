@@ -1,4 +1,4 @@
-import { ApiError, TASKS, cardsRequest, checkImages, errorResponse, logUsage, openai, requireUser, str } from "@/lib/openai";
+import { ApiError, TASKS, cardsRequest, checkImages, errorResponse, logUsage, openai, requirePaidUser, str } from "@/lib/openai";
 import { cardsPrompt, webCardsPrompt, type SubjectRef } from "@/lib/prompts";
 import { researchGoals } from "@/lib/research";
 
@@ -17,7 +17,7 @@ export async function POST(req: Request) {
   let stream: AsyncIterable<Ev>;
   let m = "", meta: Record<string, unknown> = {};
   try {
-    const user = await requireUser();
+    const user = await requirePaidUser();
     const body = await req.json();
     const subjects: SubjectRef[] = (Array.isArray(body.subjects) ? body.subjects : []).slice(0, 6).map((s: Record<string, unknown>, i: number) => ({
       key: `v${i}`, name: String(s.name ?? "").slice(0, 60), hint: s.hint ? String(s.hint).slice(0, 200) : null,

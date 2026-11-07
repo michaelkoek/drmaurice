@@ -1,5 +1,6 @@
+import { isAdmin } from "@/lib/access";
 import { sql } from "@/lib/db";
-import { ApiError, errorResponse, requireUser } from "@/lib/openai";
+import { ApiError, errorResponse, requirePaidUser } from "@/lib/openai";
 import type { Progress } from "@/lib/types";
 
 /**
@@ -42,14 +43,14 @@ const PG_CLIENT_ERRORS: Record<string, number> = { "23503": 409, "23505": 409, "
 
 export async function GET() {
   try {
-    const user = await requireUser();
+    const user = await requirePaidUser();
     const db = sql();
     const all = (t: Table) => db.query(`select ${TABLES[t].select} from ${t} where user_id = $1 order by ${TABLES[t].order}`, [user.id]);
     const [exams, subjects, lessons, own, progress] = await Promise.all([
       all("exams"), all("subjects"), all("lessons"), all("own_cards"),
       db.query("select lesson_id, mastered, first_try, last_studied_at from progress where user_id = $1", [user.id]),
     ]);
-    return Response.json({ email: user.email, exams, subjects, lessons, own, progress });
+    return Response.json({ email: user.email, admin: isAdmin(user), exams, subjects, lessons, own, progress });
   } catch (e) {
     return dataError(e);
   }
@@ -57,7 +58,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const user = await requireUser();
+    const user = await requirePaidUser();
     const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
     if (!body) throw new ApiError(400, "bad_request", "Ongeldig verzoek.");
 

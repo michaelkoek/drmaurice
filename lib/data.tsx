@@ -38,7 +38,7 @@ export const useData = () => {
   return c;
 };
 
-const empty: Snapshot = { email: null, exams: [], subjects: [], lessons: [], own: [], progress: [] };
+const empty: Snapshot = { email: null, admin: false, exams: [], subjects: [], lessons: [], own: [], progress: [] };
 const fail = (what: string) => (e: unknown) => { console.error(what, e); toast(`${what} lukte niet. Controleer je verbinding.`); throw e; };
 
 export function DataProvider({ children }: { children: React.ReactNode }) {

@@ -2,6 +2,7 @@
  * Students can sign up at /registreren, but there is no email, so the admin creates or resets accounts here:
  *   npm run user -- add <email> [naam]   create an account with a temporary password
  *   npm run user -- reset <email>        new temporary password, signs out all devices
+ *   npm run user -- grant <email>        give access without paying (Stripe normally does this)
  * Reads DATABASE_URL and BETTER_AUTH_SECRET from .env (or .env.local).
  */
 import { randomBytes } from "node:crypto";
@@ -12,9 +13,15 @@ const [cmd, rawEmail, ...nameParts] = process.argv.slice(2);
 const email = rawEmail?.trim().toLowerCase();
 
 async function main() {
-  if (!email || (cmd !== "add" && cmd !== "reset")) {
-    console.error("Gebruik: npm run user -- add <email> [naam] | reset <email>");
+  if (!email || !["add", "reset", "grant"].includes(cmd)) {
+    console.error("Gebruik: npm run user -- add <email> [naam] | reset <email> | grant <email>");
     process.exit(1);
+  }
+  if (cmd === "grant") {
+    const { rowCount } = await pool().query(`update "user" set "paidAt" = coalesce("paidAt", now()) where email = $1`, [email]);
+    if (!rowCount) throw new Error(`${email} bestaat niet.`);
+    console.log(`${email} heeft nu toegang`);
+    return;
   }
   const ctx = await auth().$context;
   const password = randomBytes(9).toString("base64url");
@@ -25,6 +32,8 @@ async function main() {
     if (existing) throw new Error(`${email} bestaat al. Gebruik 'reset'.`);
     const user = await ctx.internalAdapter.createUser({ email, name: nameParts.join(" ") || email.split("@")[0], emailVerified: true }, { method: "admin" });
     await ctx.internalAdapter.linkAccount({ userId: user.id, providerId: "credential", accountId: user.id, password: hash });
+    // accounts the admin makes skip the paywall
+    await pool().query(`update "user" set "paidAt" = now() where id = $1`, [user.id]);
     console.log(`Account aangemaakt voor ${email}`);
   } else {
     if (!existing) throw new Error(`${email} bestaat niet.`);

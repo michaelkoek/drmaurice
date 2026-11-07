@@ -26,12 +26,11 @@ export default function SignUpPage() {
     setBusy(false);
     if (error) {
       if (error.code === "USER_ALREADY_EXISTS" || error.code === "USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL") return setError("Er is al een account met dit e-mailadres. Log in.");
-      if (error.code === "SIGNUP_NOT_ALLOWED") return setError("Dit e-mailadres heeft geen toegang. Vraag de beheerder om je toe te voegen.");
       if (error.code === "WEAK_PASSWORD" || error.code === "PASSWORD_COMPROMISED") return setError(error.message ?? "Kies een sterker wachtwoord.");
       if (error.status === 429) return setError("Te veel pogingen. Wacht even en probeer het opnieuw.");
       return setError("Account aanmaken lukte niet. Probeer het opnieuw.");
     }
-    // Better Auth signs the new user in straight away
+    // Better Auth signs the new user in straight away; the app layout sends unpaid accounts to /betalen
     router.replace("/");
     router.refresh();
   }
@@ -42,7 +41,7 @@ export default function SignUpPage() {
         <img src="/icon.svg" alt="" className="size-10" />
         <div>
           <h1 className="font-display text-2xl font-bold leading-tight">Account aanmaken</h1>
-          <p className="text-sm text-muted">DrMauriceCards</p>
+          <p className="text-sm text-muted">DrMauriceCards · €5 eenmalig</p>
         </div>
       </div>
       <Panel className="p-5 shadow-card">

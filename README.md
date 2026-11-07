@@ -28,13 +28,29 @@ npm run dev
 
 1. Maak een project op [neon.com](https://neon.com). Kopieer bij **Connect** de *pooled* connection string naar `DATABASE_URL`.
 2. Maak een geheim voor de sessies: `openssl rand -base64 32` → `BETTER_AUTH_SECRET`.
-3. Maak de tabellen: `npm run db:migrate` (voert `db/migrations/*.sql` uit). Of plak `db/migrations/001_init.sql` in de **SQL Editor** van Neon.
-4. Accounts: registreren op `/registreren` kan alleen met een e-mailadres uit `SIGNUP_ALLOWED_EMAILS` (komma-gescheiden; leeg = registratie dicht). Wachtwoorden moeten minstens 10 tekens hebben met een kleine letter, hoofdletter, cijfer en symbool, mogen de e-mailnaam niet bevatten en worden geweigerd als ze in een bekend datalek staan (Have I Been Pwned, alleen de eerste 5 tekens van de SHA-1-hash gaan de deur uit). De regels staan in `lib/password.ts`. Er is geen e-mail, dus wachtwoord vergeten loopt via de beheerder:
+3. Maak de tabellen: `npm run db:migrate` (voert de nog niet uitgevoerde `db/migrations/*.sql` uit, bijgehouden in `_migrations`; nogmaals draaien doet niets).
+4. Accounts: iedereen kan registreren op `/registreren`; daarna moet je eenmalig €5 betalen (zie *Stripe instellen*). E-mailadressen in `FREE_ACCESS_EMAILS` of `ADMIN_EMAILS` hoeven niet te betalen, net als accounts van vóór de betaalmuur. Wachtwoorden moeten minstens 10 tekens hebben met een kleine letter, hoofdletter, cijfer en symbool, mogen de e-mailnaam niet bevatten en worden geweigerd als ze in een bekend datalek staan (Have I Been Pwned, alleen de eerste 5 tekens van de SHA-1-hash gaan de deur uit). De regels staan in `lib/password.ts`. Er is geen e-mail, dus wachtwoord vergeten loopt via de beheerder:
 
 ```bash
 npm run user -- add student@example.com Maurice   # toont een tijdelijk wachtwoord
 npm run user -- reset student@example.com         # nieuw tijdelijk wachtwoord, logt alle apparaten uit
+npm run user -- grant student@example.com         # toegang zonder te betalen
 ```
+
+Accounts die je met `add` maakt hebben meteen toegang.
+
+## Stripe instellen (eenmalig)
+
+1. Maak in het [Stripe Dashboard](https://dashboard.stripe.com) een product "DrMauriceCards toegang" met een **eenmalige** prijs van €5,00. Kopieer de prijs-ID (`price_…`) naar `STRIPE_PRICE_ID`. Maak bij *Developers → API keys* een **restricted key** (`rk_…`) met alleen *Checkout Sessions: Write* en zet die in `STRIPE_SECRET_KEY`. Ontwikkel in een eigen [sandbox](https://docs.stripe.com/sandboxes.md), niet in live-modus.
+2. Zet bij *Settings → Payment methods* iDEAL en kaarten aan; Checkout toont wat daar aanstaat.
+3. Webhook: *Developers → Webhooks → Add endpoint* `https://<jouw-domein>/api/stripe/webhook` met de events `checkout.session.completed`, `checkout.session.async_payment_succeeded` en `checkout.session.async_payment_failed`. Kopieer het signing secret (`whsec_…`) naar `STRIPE_WEBHOOK_SECRET`.
+4. Lokaal testen: `stripe listen --forward-to localhost:3000/api/stripe/webhook` geeft een tijdelijk `whsec_…`. Betaal met testkaart `4242 4242 4242 4242`.
+
+Na betalen zet de webhook `paidAt` op het account (`lib/stripe.ts`); `/betalen/gelukt` controleert de sessie ook zelf, zodat de student niet op de webhook hoeft te wachten. Test- en live-modus hebben elk eigen sleutels, prijs en webhook: zet de live-waarden alleen bij *Production* in Vercel.
+
+## Feedback
+
+Via **Feedback** rechtsboven sturen gebruikers ideeën en problemen (max. 10 per dag). Beheerders (`ADMIN_EMAILS`) lezen ze op `/beheer`, samen met het aantal accounts en betalingen.
 
 Geef het tijdelijke wachtwoord door; de student wijzigt het na inloggen via **Wachtwoord** rechtsboven. De scripts lezen `.env` en `.env.local`. Voor productie: zet daar tijdelijk de `DATABASE_URL` van de productie-branch.
 
@@ -45,7 +61,11 @@ Geef het tijdelijke wachtwoord door; de student wijzigt het na inloggen via **Wa
 | `DATABASE_URL` | Neon → Connect | **Alleen server.** Pooled connection string |
 | `BETTER_AUTH_SECRET` | `openssl rand -base64 32` | **Alleen server.** Ondertekent de sessie-cookies |
 | `BETTER_AUTH_URL` | | Publieke URL van de site (bv. `https://drmauricecards.vercel.app`) |
-| `SIGNUP_ALLOWED_EMAILS` | | E-mailadressen die mogen registreren, komma-gescheiden. Leeg = niemand |
+| `FREE_ACCESS_EMAILS` | | E-mailadressen met toegang zonder betalen, komma-gescheiden |
+| `ADMIN_EMAILS` | | Mogen `/beheer` openen (en hebben gratis toegang), komma-gescheiden |
+| `STRIPE_SECRET_KEY` | Stripe → Developers → API keys | **Alleen server.** Restricted key (`rk_…`, alleen *Checkout Sessions: Write*); sandbox lokaal, live in Production |
+| `STRIPE_PRICE_ID` | Stripe → Product catalogue | Prijs-ID van de eenmalige €5 |
+| `STRIPE_WEBHOOK_SECRET` | Stripe → Webhooks of `stripe listen` | **Alleen server.** Controleert dat webhooks echt van Stripe komen |
 | `OPENAI_API_KEY` | platform.openai.com | **Alleen server.** Nooit met `NEXT_PUBLIC_` ervoor |
 | `OPENAI_EVAL_DUMP` | optioneel, alleen lokaal | `1` = elke upload in `npm run dev` wordt bewaard in `.eval/inputs/` |
 
@@ -69,7 +89,7 @@ Dan op [vercel.com](https://vercel.com): **Add New → Project → Import** de r
 ## Beveiliging in het kort
 
 - De browser praat nooit direct met de database. Alles loopt via `app/api/data/route.ts`, dat elke query beperkt tot de ingelogde gebruiker en controleert dat een verwijzing (examen, vak, les) van die gebruiker is.
-- Alle API-routes weigeren verzoeken zonder ingelogde gebruiker, dus niemand anders kan je OpenAI-tegoed gebruiken.
+- Alle API-routes weigeren verzoeken zonder ingelogde gebruiker; de routes die OpenAI of de lesgegevens gebruiken eisen ook betaalde toegang (`requirePaidUser`). Alleen de Stripe-webhook heeft geen sessie; die controleert de handtekening.
 - AI-antwoorden en eigen kaarten worden bij het tonen gefilterd (`lib/sanitize.ts`): alleen `b`, `i`, `ul`, `li` en vergelijkbare opmaak blijft over.
 - `robots: noindex` staat aan; SEO is geen doel.
 

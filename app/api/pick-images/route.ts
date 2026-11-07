@@ -1,11 +1,11 @@
-import { ApiError, errorResponse, TASKS, logUsage, openai, requireUser, str } from "@/lib/openai";
+import { ApiError, errorResponse, TASKS, logUsage, openai, requirePaidUser, str } from "@/lib/openai";
 import { pickImagesPrompt, pickImagesSchema } from "@/lib/prompts";
 
 export const maxDuration = 60;
 
 export async function POST(req: Request) {
   try {
-    const user = await requireUser();
+    const user = await requirePaidUser();
     const body = await req.json();
     const max = Math.max(1, Math.min(10, Number(body.max) || 6));
     const candidates = Array.isArray(body.candidates) ? body.candidates.slice(0, 200).map((c: Record<string, unknown>) => ({

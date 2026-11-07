@@ -1,5 +1,6 @@
 import "server-only";
 import OpenAI from "openai";
+import { hasAccess } from "./access";
 import { currentUser } from "./auth";
 import { TRUSTED_DOMAINS, cardsSchema } from "./prompts";
 import type { Usage } from "./types";
@@ -85,6 +86,13 @@ export class ApiError extends Error {
 export async function requireUser() {
   const user = await currentUser();
   if (!user) throw new ApiError(401, "unauthorized", "Log eerst in.");
+  return user;
+}
+
+/** Signed in and paid (or free access): everything except paying and feedback. */
+export async function requirePaidUser() {
+  const user = await requireUser();
+  if (!hasAccess(user)) throw new ApiError(402, "payment_required", "Rond eerst je betaling af.");
   return user;
 }
 
