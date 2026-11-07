@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { useData, useExamView } from "@/lib/data";
+import { useOnline } from "@/lib/pwa";
 import { GenError, generateLesson, type StepKey, type StepState } from "@/lib/generate";
 import { manualDraft } from "@/lib/normalize";
 import { DECK_EXT, parseDeck, parseGoals, type ParsedDeck, type ParsedGoals } from "@/lib/parse";
@@ -19,6 +20,7 @@ type SlotState<T> = { status: "empty" } | { status: "reading"; name: string } | 
 export function UploadLesson({ examId }: { examId: string }) {
   const d = useData();
   const router = useRouter();
+  const online = useOnline();
   const { exam, subjects } = useExamView(examId);
   const [deck, setDeck] = useState<SlotState<ParsedDeck>>({ status: "empty" });
   const [goals, setGoals] = useState<SlotState<ParsedGoals>>({ status: "empty" });
@@ -138,9 +140,10 @@ export function UploadLesson({ examId }: { examId: string }) {
       </div>
 
       <div className="flex flex-wrap items-center gap-3.5">
-        <Btn variant="primary" disabled={(!deckReady && !hasGoals) || running} onClick={generate}>Maak flashcards</Btn>
+        <Btn variant="primary" disabled={(!deckReady && !hasGoals) || running || !online} onClick={generate}>Maak flashcards</Btn>
         <span className="text-[13px] text-muted">{
-          !deckReady && !hasGoals ? "Kies een presentatie, lesdoelen of allebei."
+          !online ? "Je bent offline. Flashcards maken kan alleen met internet."
+          : !deckReady && !hasGoals ? "Kies een presentatie, lesdoelen of allebei."
           : !deckReady ? "Geen presentatie: de AI zoekt de stof op betrouwbare Nederlandse websites en noemt per kaart de bron. Dit duurt meestal 2 tot 4 minuten."
           : !hasGoals ? "Klaar om te maken. Tip: voeg de lesdoelen toe voor betere kaarten."
           : "Klaar. Dit duurt meestal 1 tot 3 minuten."}</span>

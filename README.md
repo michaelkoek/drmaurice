@@ -14,6 +14,16 @@ Flashcards uit colleges voor een geneeskundestudent. Upload de PowerPoint of pdf
 4. **Controleren.** De student ziet naam, voorgesteld vak (aanpasbaar), kaarten per lesdoel, gaten en tegenstrijdigheden, en slaat op.
 5. **Oefenen.** Omdraaien, "Wist ik" / "Opnieuw", eigen kaarten toevoegen of een ontbrekend antwoord zelf invullen.
 
+## App (PWA)
+
+DrMauriceCards is te installeren als app (Android/desktop: knop *Installeer app* of het icoon in de adresbalk; iPhone: Safari → Deel → *Zet op beginscherm*). Uitleg voor de student staat op **Instellingen** rechtsboven.
+
+- **Offline oefenen.** De service worker (`public/sw.js`) bewaart elke bezochte pagina en haalt na het laden alle toets- en lespagina's alvast op, met de build-bestanden die ze nodig hebben. De gegevens zelf (toetsen, lessen, kaarten, voortgang) staan in IndexedDB (`lib/offline.ts`). Zonder verbinding toont de app die kopie met een melding; voortgang die offline wordt gemaakt wacht op het apparaat en wordt verstuurd zodra er weer internet is. Lessen maken, wijzigen en verwijderen kan alleen online. Een pagina die nog niet bewaard is, toont `public/offline.html`.
+- **Herinneringen.** Web Push, één melding per dag (Vercel Cron, `vercel.json`, 17:00 UTC) per apparaat dat ze aanzet, alleen als er binnen 30 dagen een toets is, er nog kaarten te gaan zijn en de student die dag nog niet oefende (`lib/reminder.ts`). Op iOS werkt dit alleen in de geïnstalleerde app (iOS 16.4+).
+- **Uitloggen** wist alles van het apparaat: bewaarde pagina's, IndexedDB en het push-abonnement.
+- De service worker draait alleen in een productie-build. Testen: `npm run build && npm start` (localhost mag zonder https). Na wijzigen van `public/sw.js` zet je `VERSION` hoger als oude caches weg moeten.
+- Iconen (`public/icon-*.png`, `app/apple-icon.png`) maak je opnieuw met `npm run icons`.
+
 ## Lokaal draaien
 
 ```bash
@@ -67,6 +77,10 @@ Geef het tijdelijke wachtwoord door; de student wijzigt het na inloggen via **Wa
 | `STRIPE_PRICE_ID` | Stripe → Product catalogue | Prijs-ID van de eenmalige €5 |
 | `STRIPE_WEBHOOK_SECRET` | Stripe → Webhooks of `stripe listen` | **Alleen server.** Controleert dat webhooks echt van Stripe komen |
 | `OPENAI_API_KEY` | platform.openai.com | **Alleen server.** Nooit met `NEXT_PUBLIC_` ervoor |
+| `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | `npx web-push generate-vapid-keys` | Publieke sleutel voor push. Overal hetzelfde paar gebruiken |
+| `VAPID_PRIVATE_KEY` | idem | **Alleen server.** Privésleutel voor push |
+| `VAPID_SUBJECT` | | `mailto:` van de beheerder; pushdiensten gebruiken het bij problemen |
+| `CRON_SECRET` | `openssl rand -hex 24` | **Alleen server.** Vercel Cron stuurt het mee naar `/api/cron/reminders` |
 | `OPENAI_EVAL_DUMP` | optioneel, alleen lokaal | `1` = elke upload in `npm run dev` wordt bewaard in `.eval/inputs/` |
 
 Het model per taak staat vast in `TASKS` in `lib/openai.ts` (Luna voor de afbeeldingskeuze, Sol voor de kaarten uit een presentatie). Lessen zonder presentatie zoekt eerst Luna op; lesdoelen die Luna niet goed dekt (niet volledig, of een antwoord zonder link naar een toegestane Nederlandse site) doet Sol opnieuw (`lib/research.ts`). Met `auto` als model vergelijk je die hele aanpak in `npm run eval:models`. Wil je een goedkoper model proberen voor de kaarten? Upload een paar echte lessen met `OPENAI_EVAL_DUMP=1 npm run dev` en draai daarna `npm run eval:models` (eventueel met eigen modellen, zoals `npm run eval:models -- gpt-6-luna:low gpt-6.1-sol:low`). Per les komt er een HTML-vergelijking in `.eval/out/`. Dit kost echt OpenAI-tegoed.
@@ -89,7 +103,8 @@ Dan op [vercel.com](https://vercel.com): **Add New → Project → Import** de r
 ## Beveiliging in het kort
 
 - De browser praat nooit direct met de database. Alles loopt via `app/api/data/route.ts`, dat elke query beperkt tot de ingelogde gebruiker en controleert dat een verwijzing (examen, vak, les) van die gebruiker is.
-- Alle API-routes weigeren verzoeken zonder ingelogde gebruiker; de routes die OpenAI of de lesgegevens gebruiken eisen ook betaalde toegang (`requirePaidUser`). Alleen de Stripe-webhook heeft geen sessie; die controleert de handtekening.
+- Alle API-routes weigeren verzoeken zonder ingelogde gebruiker; de routes die OpenAI of de lesgegevens gebruiken eisen ook betaalde toegang (`requirePaidUser`). Alleen de Stripe-webhook (handtekening) en de herinneringen-cron (`CRON_SECRET`) hebben geen sessie.
+- Push-abonnementen worden alleen bewaard voor bekende pushdiensten (Google, Apple, Mozilla, Microsoft), zodat de server niet naar willekeurige adressen gaat posten.
 - AI-antwoorden en eigen kaarten worden bij het tonen gefilterd (`lib/sanitize.ts`): alleen `b`, `i`, `ul`, `li` en vergelijkbare opmaak blijft over.
 - `robots: noindex` staat aan; SEO is geen doel.
 

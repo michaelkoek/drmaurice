@@ -1,6 +1,8 @@
 "use client";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { backend, type Snapshot } from "./backend";
+import { addPending, isNetworkError, loadPending, loadSnapshot, removePending, saveSnapshot } from "./offline";
+import { forgetDevice } from "./pwa";
 import { cardsOf, lessonStats } from "./stats";
 import { plainToHtml } from "./sanitize";
 import type { Card, Draft, Exam, Lesson, OwnCard, Progress, Subject } from "./types";
@@ -9,6 +11,10 @@ import { toast } from "@/components/ui";
 interface Ctx extends Snapshot {
   ready: boolean;
   error: string | null;
+  /** set while showing the copy saved on this device because the server could not be reached: when it was saved */
+  cachedAt: string | null;
+  /** lessons whose progress is waiting to be saved (made offline) */
+  pendingSync: number;
   reload(): Promise<void>;
   // exams & subjects
   createExam(input: { name: string; exam_date: string | null; question_count: number | null; subjects: { name: string; hint: string | null }[] }): Promise<Exam>;
@@ -39,29 +45,93 @@ export const useData = () => {
 };
 
 const empty: Snapshot = { email: null, admin: false, exams: [], subjects: [], lessons: [], own: [], progress: [] };
-const fail = (what: string) => (e: unknown) => { console.error(what, e); toast(`${what} lukte niet. Controleer je verbinding.`); throw e; };
+const fail = (what: string) => (e: unknown) => {
+  console.error(what, e);
+  toast(navigator.onLine ? `${what} lukte niet. Controleer je verbinding.` : `Je bent offline. ${what} kan weer zodra je internet hebt.`);
+  throw e;
+};
+/** Worth retrying later: no connection, or a database hiccup (not a refusal such as a deleted lesson). */
+const retryable = (e: unknown) => isNetworkError(e) || (e as { code?: string })?.code === "db_error";
+
+/** Progress still waiting to be saved is newer than what the saved copy holds. */
+const withPending = (s: Snapshot, pending: Record<string, Progress>): Snapshot =>
+  ({ ...s, progress: [...s.progress.filter((p) => !pending[p.lesson_id]), ...Object.values(pending)] });
 
 export function DataProvider({ children }: { children: React.ReactNode }) {
   const [snap, setSnap] = useState<Snapshot>(empty);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [cachedAt, setCachedAt] = useState<string | null>(null);
+  const [pendingSync, setPendingSync] = useState(0);
   const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const progressRef = useRef<Progress[]>([]);
   progressRef.current = snap.progress;
+  // snap holds the student's real data (not the empty placeholder), so it may be saved on the device
+  const loaded = useRef(false);
+  const cachedRef = useRef<string | null>(null);
+  cachedRef.current = cachedAt;
+  const warnedOffline = useRef(false);
+
+  /** Sends progress made offline. Stops at the first network error; the rest waits for the next try. */
+  const syncPending = useCallback(async () => {
+    for (const p of Object.values(await loadPending())) {
+      try { await backend.saveProgress(p); await removePending(p.lesson_id, p); }
+      catch (e) { if (retryable(e)) break; await removePending(p.lesson_id, p); }
+    }
+    setPendingSync(Object.keys(await loadPending()).length);
+  }, []);
 
   const reload = useCallback(async () => {
-    try { setSnap(await backend.load()); setError(null); }
-    catch (e) { console.error(e); setError("Je gegevens konden niet geladen worden."); }
-    finally { setReady(true); }
-  }, []);
+    // first send what was practised offline, so the fresh copy includes it
+    await syncPending();
+    try {
+      const s = await backend.load();
+      loaded.current = true;
+      setSnap(s); setCachedAt(null); setError(null);
+    } catch (e) {
+      console.error(e);
+      const saved = await loadSnapshot();
+      if (saved) {
+        loaded.current = true;
+        setSnap(withPending(saved.snap, await loadPending())); setCachedAt(saved.savedAt); setError(null);
+      } else {
+        setError(navigator.onLine ? "Je gegevens konden niet geladen worden." : "Je bent offline en er staan nog geen lessen op dit apparaat. Open de app één keer met internet.");
+      }
+    } finally { setReady(true); }
+  }, [syncPending]);
   useEffect(() => { reload(); }, [reload]);
 
-  // progress is written at most once per 700 ms per lesson
+  // keep a copy on the device for offline use
+  useEffect(() => {
+    if (!loaded.current) return;
+    const t = setTimeout(() => { if (loaded.current) saveSnapshot(snap); }, 800);
+    return () => clearTimeout(t);
+  }, [snap]);
+
+  // back online: send offline progress, and replace the device copy by the real data
+  useEffect(() => {
+    const onOnline = () => { syncPending().then(() => { if (cachedRef.current) reload(); }); };
+    const onVisible = () => { if (document.visibilityState === "visible" && navigator.onLine) onOnline(); };
+    addEventListener("online", onOnline);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => { removeEventListener("online", onOnline); document.removeEventListener("visibilitychange", onVisible); };
+  }, [syncPending, reload]);
+
+  // progress is written at most once per 700 ms per lesson; offline it waits on the device
   const flushProgress = useCallback((lessonId: string) => {
     clearTimeout(timers.current[lessonId]);
-    timers.current[lessonId] = setTimeout(() => {
+    timers.current[lessonId] = setTimeout(async () => {
       const p = progressRef.current.find((x) => x.lesson_id === lessonId);
-      if (p) backend.saveProgress(p).catch(() => toast("Voortgang opslaan lukte niet."));
+      if (!p) return;
+      try {
+        await backend.saveProgress(p);
+        await removePending(lessonId);
+      } catch (e) {
+        if (!retryable(e)) return toast("Voortgang opslaan lukte niet.");
+        await addPending(p);
+        if (!warnedOffline.current) { warnedOffline.current = true; toast("Offline: je voortgang wordt bewaard en later opgeslagen."); }
+      }
+      setPendingSync(Object.keys(await loadPending()).length);
     }, 700);
   }, []);
 
@@ -77,7 +147,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       flushProgress(lessonId);
     };
     return {
-      ...snap, ready, error, reload,
+      ...snap, ready, error, cachedAt, pendingSync, reload,
       async createExam({ subjects, ...exam }) {
         const e = await backend.insert<Exam>("exams", exam).catch(fail("Examen aanmaken"));
         const subs: Subject[] = [];
@@ -152,9 +222,16 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       resetProgress(lessonId) {
         patchProgress(lessonId, (p) => ({ ...p, mastered: [], first_try: {}, last_studied_at: new Date().toISOString() }));
       },
-      async signOut() { await backend.signOut(); window.location.href = "/login"; },
+      async signOut() {
+        // progress made offline would otherwise be lost with the device copy
+        if (pendingSync) await syncPending();
+        loaded.current = false;
+        await forgetDevice().catch((e) => console.warn("[signOut]", e));
+        await backend.signOut();
+        window.location.href = "/login";
+      },
     };
-  }, [snap, ready, error, reload, flushProgress]);
+  }, [snap, ready, error, cachedAt, pendingSync, reload, syncPending, flushProgress]);
 
   return <DataCtx.Provider value={value}>{children}</DataCtx.Provider>;
 }

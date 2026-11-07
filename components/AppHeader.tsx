@@ -13,7 +13,7 @@ export function AppHeader() {
         <span className="hidden sm:inline">{email}</span>
         {admin && <Link href="/beheer" className="rounded-lg px-2 py-1 font-semibold hover:text-ink">Beheer</Link>}
         <Link href="/feedback" className="rounded-lg px-2 py-1 font-semibold hover:text-ink">Feedback</Link>
-        <Link href="/wachtwoord" className="rounded-lg px-2 py-1 font-semibold hover:text-ink">Wachtwoord</Link>
+        <Link href="/instellingen" className="rounded-lg px-2 py-1 font-semibold hover:text-ink">Instellingen</Link>
         <button onClick={signOut} className="rounded-lg px-2 py-1 font-semibold hover:text-ink">Uitloggen</button>
       </div>
     </header>

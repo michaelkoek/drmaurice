@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { DataProvider } from "@/lib/data";
 import { Toaster } from "@/components/ui";
 import { AppHeader } from "@/components/AppHeader";
+import { ConnectionBanner, InstallHint, PwaClient } from "@/components/Pwa";
 import { hasAccess } from "@/lib/access";
 import { currentUser } from "@/lib/auth";
 
@@ -16,9 +17,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <DataProvider>
       <div className="mx-auto max-w-[1160px] px-4 pb-12 pt-[max(12px,env(safe-area-inset-top))]">
         <AppHeader />
+        <ConnectionBanner />
+        <InstallHint />
         {children}
       </div>
       <Toaster />
+      <PwaClient />
     </DataProvider>
   );
 }

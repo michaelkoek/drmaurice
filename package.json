@@ -11,6 +11,7 @@
     "verify": "npm run typecheck && npm test && npm run build",
     "user": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.local --conditions=react-server scripts/user.ts",
     "eval:models": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.local --conditions=react-server scripts/compare-models.ts",
+    "icons": "node scripts/icons.mjs",
     "db:migrate": "node --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/migrate.mjs"
   },
   "dependencies": {
@@ -29,7 +30,8 @@
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "server-only": "^0.0.1",
-    "stripe": "^23.1.0"
+    "stripe": "^23.1.0",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "@better-auth/cli": "^1.4.22",
@@ -37,6 +39,7 @@
     "@types/node": "^26.6.3",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
+    "@types/web-push": "^3.6.4",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.23.15",
     "typescript": "~5.9.3",

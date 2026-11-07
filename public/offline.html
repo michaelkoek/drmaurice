@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Offline · DrMauriceCards</title>
+  <link rel="icon" href="/icon.svg">
+  <style>
+    /* same palette as app/globals.css; this page is shown by the service worker without the app's CSS */
+    :root { --bg: #f5f6f4; --surface: #fff; --ink: #1f2430; --muted: #5f6674; --line: #e2e5e1; --accent: #1f5e8c; color-scheme: light dark; }
+    @media (prefers-color-scheme: dark) { :root { --bg: #111419; --surface: #1a1e25; --ink: #e9ecf1; --muted: #a3aab6; --line: #2b313b; --accent: #7fb4de; } }
+    body { margin: 0; min-height: 100dvh; display: grid; place-items: center; background: var(--bg); color: var(--ink); font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; padding: 16px; box-sizing: border-box; }
+    main { max-width: 380px; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 28px 24px; text-align: center; }
+    img { width: 56px; height: 56px; }
+    h1 { font-size: 20px; margin: 14px 0 6px; }
+    p { color: var(--muted); margin: 0 0 18px; }
+    a, button { display: inline-block; font: inherit; font-weight: 600; border-radius: 10px; padding: 9px 16px; cursor: pointer; text-decoration: none; }
+    button { background: var(--accent); color: var(--bg); border: 0; }
+    a { color: var(--accent); }
+  </style>
+</head>
+<body>
+  <main>
+    <img src="/icon.svg" alt="">
+    <h1>Je bent offline</h1>
+    <p>Deze pagina is nog niet op dit apparaat bewaard. Lessen die je eerder met internet hebt geopend, kun je wel offline oefenen.</p>
+    <button onclick="location.reload()">Opnieuw proberen</button>
+    <a href="/">Naar overzicht</a>
+  </main>
+  <script>addEventListener("online", () => location.reload());</script>
+</body>
+</html>
